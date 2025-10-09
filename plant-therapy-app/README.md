@@ -4,6 +4,17 @@ This React application implements the homepage for the Plant Metaphor Therapy Mo
 
 ## Features Implemented
 
+### 🎨 Interactive Canvas (NEW!)
+- **Drawing Tools**: Pen, Fill, Eraser with customizable size & opacity
+- **Color System**: 12-color palette + color wheel + recent colors
+- **Text Input**: Add text anywhere on canvas
+- **Audio Input**: Voice interaction (UI ready)
+- **Progress Tracking**: Visual step indicators
+- **Chat Interface**: AI chatbot guidance
+- **History**: Full undo/redo support
+- **Completion Screen**: Rating & save functionality
+- **Bilingual**: Full EN/中文 support
+
 ### 🌐 Language Toggle
 - **English/Chinese switching** (EN/中)
 - Positioned in top-right corner
@@ -51,10 +62,10 @@ Complete set of 8 therapy modules with bilingual support:
 - **White**: `#FFFFFF`
 
 ### 🔤 Typography
-- **English**: Inter font family (fallback to Avenir)
-- **Chinese**: System fonts with 圆体 preference
+- **English**: Avenir font family (Book, Medium, Heavy)
+- **Chinese**: System fonts with 圆体 (Yuanti) preference
 - **Font sizes**: Following design specs (6pt-13pt)
-- **Font weights**: Book (400), Medium (500), Heavy (700)
+- **Font weights**: Book (400), Medium (500), Heavy (900)
 
 ### 📱 Responsive Design
 - **Desktop**: Full sidebar layout
@@ -134,6 +145,16 @@ This implementation strictly follows the design document specifications:
 - ✅ Safari (latest)
 - ✅ Edge (latest)
 - ✅ Mobile browsers (iOS Safari, Chrome Mobile)
+
+---
+
+## 📚 Documentation
+
+- **DESIGN_UPDATES.md** - Complete design alignment details
+- **CHANGES_SUMMARY.md** - Quick before/after comparison
+- **ICON_CORRECTIONS.md** - Icon verification and changes
+- **CANVAS_IMPLEMENTATION.md** - Technical canvas documentation
+- **CANVAS_FEATURES.md** - User guide for canvas features
 
 ---
 

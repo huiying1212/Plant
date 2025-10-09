@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import './App.css';
+import Canvas from './Canvas';
 
 function App() {
   const [language, setLanguage] = useState('EN');
   const [activeModule, setActiveModule] = useState(null);
   const [activeNavItem, setActiveNavItem] = useState('Activity');
   const [showSource, setShowSource] = useState(false);
+  const [showCanvas, setShowCanvas] = useState(false);
 
   const toggleLanguage = () => {
     setLanguage(language === 'EN' ? '中' : 'EN');
@@ -30,7 +32,7 @@ function App() {
       timeCN: '6分钟',
       descriptionEN: 'Uses a flower\'s parts to represent self-worth, growth, and nurturing personal strengths.',
       descriptionCN: '用花的各部分展现自我价值与成长。',
-      icon: '/element/flower.svg'
+      icon: '/element/flower 2.svg'
     },
     {
       id: 3,
@@ -70,7 +72,7 @@ function App() {
       timeCN: '10分钟',
       descriptionEN: 'Frames the life or mind as a garden, where thoughts and experiences are planted seeds.',
       descriptionCN: '把生活和心灵比作花园，种下想法与经历。',
-      icon: '/element/garden.svg'
+      icon: '/element/garden 2.svg'
     },
     {
       id: 7,
@@ -105,7 +107,7 @@ function App() {
   };
 
   const sidebarNavItems = [
-    { key: 'Activity', icon: '/element/home.svg' },
+    { key: 'Activity', icon: '/element/collection.svg' },
     { key: 'History', icon: '/element/archive.svg' },
     { key: 'Settings', icon: '/element/setting.svg' }
   ];
@@ -121,6 +123,10 @@ function App() {
     '[Peer-reviewed] Murphy, J. Implementing the Tree of Life: A Mindfulness-Based Intervention Focusing on Positive Self-Cognitions.',
     '[Peer-reviewed] Ivanov, K. V. (2024). The cause of the current of the problem of palliative medicine in the “mirror” of shmerian-akkadian mythology. Bioethics journal, 17(2), 21-26.'
   ];
+
+  if (showCanvas) {
+    return <Canvas language={language} onClose={() => setShowCanvas(false)} />;
+  }
 
   return (
     <div className="app">
@@ -206,7 +212,7 @@ function App() {
               </div>
 
               <div className="detail-actions">
-                <button className="start-button">
+                <button className="start-button" onClick={() => setShowCanvas(true)}>
                   {language === 'EN' ? 'Start' : '开始'}
                 </button>
               </div>
