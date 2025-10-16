@@ -32,7 +32,7 @@ function App() {
       timeCN: '6分钟',
       descriptionEN: 'Uses a flower\'s parts to represent self-worth, growth, and nurturing personal strengths.',
       descriptionCN: '用花的各部分展现自我价值与成长。',
-      icon: '/element/flower 2.svg'
+      icon: '/element/Self-esteem flower.svg'
     },
     {
       id: 3,
@@ -42,7 +42,7 @@ function App() {
       timeCN: '10分钟',
       descriptionEN: 'Uses the concept of a garden to understand and track the healing process.',
       descriptionCN: '用花园比喻记录疗愈历程。',
-      icon: '/element/seedling.svg'
+      icon: '/element/Seed-to-Weed.svg'
     },
     {
       id: 4,
@@ -52,7 +52,7 @@ function App() {
       timeCN: '8分钟',
       descriptionEN: 'Uses the metaphor of the rosebush\'s features to express emotional state and inner world.',
       descriptionCN: '用蔷薇花丛比喻表达情绪与内心世界。',
-      icon: '/element/rose.svg'
+      icon: '/element/Rosebush fantasy.svg'
     },
     {
       id: 5,
@@ -72,7 +72,7 @@ function App() {
       timeCN: '10分钟',
       descriptionEN: 'Frames the life or mind as a garden, where thoughts and experiences are planted seeds.',
       descriptionCN: '把生活和心灵比作花园，种下想法与经历。',
-      icon: '/element/garden 2.svg'
+      icon: '/element/The garden.svg'
     },
     {
       id: 7,
@@ -82,7 +82,7 @@ function App() {
       timeCN: '12分钟',
       descriptionEN: 'Uses a tree as a narrative tool to explore their life story, strengths, relationships, and challenges.',
       descriptionCN: '用树探索生命故事、优势与人际挑战。',
-      icon: '/element/plant.svg'
+      icon: '/element/The Tree Me.svg'
     },
     {
       id: 8,
@@ -92,7 +92,7 @@ function App() {
       timeCN: '15分钟',
       descriptionEN: 'Uses the cyclical nature of the four seasons to understand and cope with change, loss, and grief.',
       descriptionCN: '以四季循环理解变化与悲伤。',
-      icon: '/element/season.svg'
+      icon: '/element/Seasons for Growth.svg'
     }
   ];
 
@@ -107,7 +107,7 @@ function App() {
   };
 
   const sidebarNavItems = [
-    { key: 'Activity', icon: '/element/collection.svg' },
+    { key: 'Activity', icon: '/element/Activity.svg' },
     { key: 'History', icon: '/element/archive.svg' },
     { key: 'Settings', icon: '/element/setting.svg' }
   ];
@@ -179,8 +179,7 @@ function App() {
               </button>
 
               <div className="hero-card">
-                <img className="hero-overlay" src="/element/season.svg" alt="Season" />
-                <img className="hero-main" src="/element/tree.svg" alt="Tree of Life" />
+                <img className="hero-main" src="/element/Template (Tree of Life).jpg" alt="Tree of Life" />
               </div>
 
               <div className="detail-toolbar">

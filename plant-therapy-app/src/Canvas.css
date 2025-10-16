@@ -558,7 +558,6 @@
 .cheers-icon {
   width: 80px;
   height: 80px;
-  filter: invert(45%) sepia(69%) saturate(444%) hue-rotate(55deg) brightness(93%) contrast(87%);
 }
 
 .completion-message {
