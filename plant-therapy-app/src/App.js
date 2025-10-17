@@ -22,7 +22,7 @@ function App() {
       timeCN: '15分钟',
       descriptionEN: 'Uses a tree\'s parts to articulate their personal histories, skills, values, and future aspirations.',
       descriptionCN: '用树的各部分表达个人经历、技能与未来愿景。',
-      icon: '/element/tree.svg'
+      icon: '/element/tree2.svg'
     },
     {
       id: 2,

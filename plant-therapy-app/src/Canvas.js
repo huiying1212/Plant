@@ -269,7 +269,7 @@ function Canvas({ language, onClose }) {
             <img src="/element/undo.svg" alt="Undo" />
           </button>
           <button className="toolbar-btn" onClick={redo} disabled={historyStep === history.length - 1}>
-            <img src="/element/forward.svg" alt="Redo" />
+            <img src="/element/redo.svg" alt="Redo" />
           </button>
         </div>
 
