@@ -15,7 +15,7 @@ function Canvas({ language, onClose }) {
   const [showTextInput, setShowTextInput] = useState(false);
   const [showAudioInput, setShowAudioInput] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [chatPanelOpen, setChatPanelOpen] = useState(true);
+  const [chatPanelOpen, setChatPanelOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [textInputValue, setTextInputValue] = useState('');
   const [canvasTexts, setCanvasTexts] = useState([]);
@@ -77,7 +77,79 @@ function Canvas({ language, onClose }) {
       canvas.height = window.innerHeight;
       ctx.fillStyle = '#F5F5F5';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      saveToHistory();
+      
+      // Load and draw SVG files from public/canvas/1/English
+      const svgFiles = [
+        'Chatbot 02 (ROOT)-01.svg',
+        'Chatbot 03 (TRUNK)_画板 6.svg',
+        'Chatbot 04 (BRANCH)_画板 7.svg',
+        'Chatbot 05 (LEAVES)_画板 9.svg',
+        'Chatbot 06 (FLOWER)_画板 9.svg',
+        'Chatbot 07 (BUG)_画板 10.svg',
+        'Chatbot 08 (STORM)_画板 11.svg'
+      ];
+      
+      // Calculate position: center slightly to the left
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const offsetX = -150; // Offset to the left (negative = left)
+      const startX = centerX + offsetX;
+      const startY = centerY;
+      
+      // Load and draw each SVG
+      let loadedCount = 0;
+      const svgImages = [];
+      let svgsDrawn = false; // Flag to ensure SVGs are only drawn once
+      
+      const drawSVGs = () => {
+        if (svgsDrawn) return; // Don't redraw if already drawn
+        
+        // Check if all images are loaded
+        const allLoaded = svgImages.every((img, idx) => img && img.complete);
+        
+        if (allLoaded && loadedCount === svgFiles.length) {
+          // Draw all SVGs at the same position to form a complete tree
+          const scale = 1; // Scale factor to make SVGs larger (2x = double size)
+          
+          svgImages.forEach((svgImg, idx) => {
+            if (svgImg && svgImg.complete) {
+              // Use original dimensions from viewBox (655x493) and apply scale
+              const baseWidth = 655;
+              const baseHeight = 493;
+              const svgWidth = baseWidth * scale;
+              const svgHeight = baseHeight * scale;
+              
+              // All SVGs at the same position (center slightly to the left)
+              const x = startX - svgWidth / 2;
+              const y = startY - svgHeight / 2;
+              
+              // Draw the SVG image with scaled size while maintaining aspect ratio
+              ctx.drawImage(svgImg, x, y, svgWidth, svgHeight);
+            }
+          });
+          
+          svgsDrawn = true;
+          saveToHistory();
+        }
+      };
+      
+      svgFiles.forEach((svgFile, index) => {
+        const img = new Image();
+        img.onload = () => {
+          svgImages[index] = img;
+          loadedCount++;
+          drawSVGs();
+        };
+        img.onerror = (error) => {
+          console.error(`Error loading SVG: ${svgFile}`, error);
+          loadedCount++;
+          if (loadedCount === svgFiles.length) {
+            drawSVGs();
+          }
+        };
+        // Use encodeURIComponent to handle special characters in filename
+        img.src = `/canvas/1/English/${encodeURIComponent(svgFile)}`;
+      });
       
       // Handle resize - preserve existing content
       const resizeCanvas = () => {
@@ -374,6 +446,36 @@ function Canvas({ language, onClose }) {
     );
   }
 
+  const currentStepData = steps[currentStep] || {};
+
+  const sampleRoots = [
+    {
+      color: '#B78A60',
+      entriesEN: ['Faith', 'Mom', 'Grandfather', 'Family'],
+      entriesCN: ['信仰', '妈妈', '外公', '家人']
+    },
+    {
+      color: '#F3A6C4',
+      entriesEN: ['Hometown', 'Piano', 'My students'],
+      entriesCN: ['家乡', '钢琴', '我的学生']
+    },
+    {
+      color: '#F1C453',
+      entriesEN: ['My 3 cats: Bella, Juniper, Kiki', 'My friend Lina'],
+      entriesCN: ['我的三只猫：贝拉、杜松、琪琪', '朋友丽娜']
+    }
+  ];
+
+  const renderTextWithBreaks = (text = '') => {
+    const lines = text.split('\n');
+    return lines.map((line, idx) => (
+      <React.Fragment key={idx}>
+        {line}
+        {idx !== lines.length - 1 && <br />}
+      </React.Fragment>
+    ));
+  };
+
   return (
     <div className="canvas-container">
       {/* Top Toolbar */}
@@ -403,7 +505,10 @@ function Canvas({ language, onClose }) {
           </div>
         </div>
 
-        <button className="toolbar-btn ai-btn">
+        <button 
+          className={`toolbar-btn ai-btn ${chatPanelOpen ? 'active' : ''}`}
+          onClick={() => setChatPanelOpen((open) => !open)}
+        >
           <img src="/element/robot.svg" alt="AI" />
         </button>
       </div>
@@ -598,6 +703,144 @@ function Canvas({ language, onClose }) {
           </div>
         </div>
       )}
+
+      {/* Chat / Guidance Panel */}
+      <aside className={`chat-panel ${chatPanelOpen ? 'open' : 'closed'}`}>
+        <div className="chat-panel-header">
+          <div className="chat-panel-title">
+            <span className="chat-panel-step-label">
+              {language === 'EN' ? 'Tree of Life' : '生命之树'}
+            </span>
+            <h3>
+              {language === 'EN'
+                ? currentStepData.instructionEN
+                : currentStepData.instructionCN}
+            </h3>
+          </div>
+          <button
+            type="button"
+            className="chat-panel-close-btn"
+            onClick={() => setChatPanelOpen(false)}
+            aria-label={language === 'EN' ? 'Hide guidance' : '收起指南'}
+          >
+            <img src="/element/hide.svg" alt="Hide" />
+          </button>
+        </div>
+
+        <div className="chat-panel-content">
+          <div className="chat-guidance-card">
+            <p className="chat-guidance-heading">
+              {language === 'EN'
+                ? 'Think about your origins and foundations.'
+                : '想一想你的起点与根基。'}
+            </p>
+            <p className="chat-guidance-body">
+              {language === 'EN'
+                ? renderTextWithBreaks(currentStepData.descriptionEN)
+                : renderTextWithBreaks(currentStepData.descriptionCN)}
+            </p>
+          </div>
+
+          <div className="chat-roots-board">
+            <p className="chat-roots-label">
+              {language === 'EN'
+                ? 'Example roots you might draw'
+                : '可以描绘的根部示例'}
+            </p>
+            <div className="chat-roots-list">
+              {sampleRoots.map((root, idx) => (
+                <div className="chat-root-item" key={idx}>
+                  <span
+                    className="chat-root-stroke"
+                    style={{ backgroundColor: root.color }}
+                  />
+                  <div className="chat-root-text">
+                    {(language === 'EN' ? root.entriesEN : root.entriesCN).map(
+                      (entry, entryIdx) => (
+                        <span key={entryIdx}>{entry}</span>
+                      )
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="chat-messages">
+            {chatMessages.map((message, idx) => (
+              <div
+                key={message.timestamp || idx}
+                className={`chat-message ${message.sender}`}
+              >
+                <div className="chat-bubble">
+                  {renderTextWithBreaks(message.text)}
+                </div>
+                <span className="chat-timestamp">
+                  {new Date(message.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+              </div>
+            ))}
+            {isLLMTyping && (
+              <div className="chat-message bot typing">
+                <div className="chat-bubble typing-indicator">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </div>
+            )}
+            <div ref={chatMessagesEndRef} />
+          </div>
+        </div>
+
+        <div className="chat-panel-footer">
+          <div className="chat-input-wrapper">
+            <textarea
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={handleChatKeyPress}
+              placeholder={
+                language === 'EN'
+                  ? 'Ask the guide for help...'
+                  : '向小助手提问或求助…'
+              }
+            />
+            <button
+              type="button"
+              className="chat-send-btn"
+              onClick={sendChatMessage}
+              disabled={!chatInput.trim() || isLLMTyping}
+            >
+              <img src="/element/forward.svg" alt="Send" />
+            </button>
+          </div>
+          <div className="chat-footer-tools">
+            <button type="button" className="chat-footer-btn">
+              <img src="/element/microphone.svg" alt="Microphone" />
+            </button>
+            <button
+              type="button"
+              className="chat-footer-btn"
+              onClick={() => setShowTextInput(true)}
+            >
+              <img src="/element/keyboard.svg" alt="Keyboard" />
+            </button>
+            <button
+              type="button"
+              className="chat-footer-btn"
+              onClick={() => setIsMuted((prev) => !prev)}
+            >
+              <img
+                src={isMuted ? '/element/mute.svg' : '/element/unmute.svg'}
+                alt={isMuted ? 'Muted' : 'Unmuted'}
+              />
+            </button>
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }
