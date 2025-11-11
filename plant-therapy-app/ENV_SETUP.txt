@@ -1,0 +1,31 @@
+===================================
+环境变量配置 Environment Setup
+===================================
+
+要启用LLM聊天功能，请按以下步骤配置：
+To enable LLM chat functionality, follow these steps:
+
+1. 在 plant-therapy-app 目录下创建 .env.local 文件
+   Create a .env.local file in the plant-therapy-app directory
+
+2. 添加以下内容（替换为你的实际API密钥）：
+   Add the following content (replace with your actual API key):
+
+   REACT_APP_OPENAI_API_KEY=sk-your-actual-api-key-here
+
+3. 可选配置 Optional configurations:
+   
+   REACT_APP_OPENAI_MODEL=gpt-4
+   或 or
+   REACT_APP_OPENAI_MODEL=gpt-3.5-turbo
+
+4. 获取API密钥：
+   Get your API key from:
+   https://platform.openai.com/api-keys
+
+注意：如果不配置API密钥，应用会使用Mock模式，提供预设的测试响应。
+Note: Without an API key, the app will use Mock mode with preset test responses.
+
+===================================
+
+

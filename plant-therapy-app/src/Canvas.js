@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Canvas.css';
+import llmService from './llmService';
 
 function Canvas({ language, onClose }) {
   const canvasRef = useRef(null);
+  const chatMessagesEndRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentTool, setCurrentTool] = useState('pen'); // pen, fill, eraser
   const [brushSize, setBrushSize] = useState(5);
   const [brushOpacity, setBrushOpacity] = useState(100);
-  const [currentColor, setCurrentColor] = useState('#333333');
-  const [recentColors, setRecentColors] = useState(['#333333']);
+  const [currentColor, setCurrentColor] = useState('#EA5851');
+  const [recentColors, setRecentColors] = useState(['#EA5851']);
   const [showColorWheel, setShowColorWheel] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
   const [showAudioInput, setShowAudioInput] = useState(false);
@@ -21,11 +23,16 @@ function Canvas({ language, onClose }) {
   const [historyStep, setHistoryStep] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [rating, setRating] = useState(null);
+  
+  // Chat-related state
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isLLMTyping, setIsLLMTyping] = useState(false);
 
   const colorPalette = [
-    '#EA5851', '#D42E4C', '#EF9537', '#EB5A29',
-    '#F7D548', '#F1A23B', '#7EDF71', '#4CA765',
-    '#3C87D8', '#2A639D', '#93278F', '#662D91'
+    '#EA5851', '#FF8C42', '#FFD93D', '#6BCF7F',
+    '#4ECDC4', '#45B7D1', '#2E3A87', '#9B59B6',
+    '#000000', '#FFFFFF'
   ];
 
   const colorWheelPalette = [
@@ -61,23 +68,134 @@ function Canvas({ language, onClose }) {
     }
   ];
 
-  const chatMessages = [
-    {
-      sender: 'bot',
-      textEN: steps[currentStep]?.instructionEN || '',
-      textCN: steps[currentStep]?.instructionCN || ''
-    }
-  ];
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
+      // Initial setup
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#FFFFFF';
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      ctx.fillStyle = '#F5F5F5';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       saveToHistory();
+      
+      // Handle resize - preserve existing content
+      const resizeCanvas = () => {
+        const currentImage = canvas.toDataURL();
+        const img = new Image();
+        img.onload = () => {
+          const oldWidth = canvas.width;
+          const oldHeight = canvas.height;
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+          const newCtx = canvas.getContext('2d');
+          newCtx.fillStyle = '#F5F5F5';
+          newCtx.fillRect(0, 0, canvas.width, canvas.height);
+          // Draw the old content
+          newCtx.drawImage(img, 0, 0, oldWidth, oldHeight, 0, 0, oldWidth, oldHeight);
+          saveToHistory();
+        };
+        img.src = currentImage;
+      };
+      
+      window.addEventListener('resize', resizeCanvas);
+      
+      return () => {
+        window.removeEventListener('resize', resizeCanvas);
+      };
     }
   }, []);
+
+  // Initialize chat with welcome message when component mounts or step changes
+  useEffect(() => {
+    const welcomeMessage = {
+      sender: 'bot',
+      text: language === 'EN' ? steps[currentStep]?.instructionEN : steps[currentStep]?.instructionCN,
+      timestamp: new Date().toISOString()
+    };
+    setChatMessages([welcomeMessage]);
+  }, [currentStep, language]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (chatMessagesEndRef.current) {
+      chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
+
+  // Send message to LLM
+  const sendChatMessage = async () => {
+    if (!chatInput.trim() || isLLMTyping) return;
+
+    const userMessage = {
+      sender: 'user',
+      text: chatInput,
+      timestamp: new Date().toISOString()
+    };
+
+    // Add user message to chat
+    const updatedMessages = [...chatMessages, userMessage];
+    setChatMessages(updatedMessages);
+    setChatInput('');
+    setIsLLMTyping(true);
+
+    try {
+      // Get LLM response from GPT-5
+      const llmResponse = await llmService.sendMessage(
+        updatedMessages,
+        language,
+        currentStep
+      );
+
+      // Add LLM response to chat
+      const botMessage = {
+        sender: 'bot',
+        text: llmResponse,
+        timestamp: new Date().toISOString()
+      };
+      
+      setChatMessages([...updatedMessages, botMessage]);
+    } catch (error) {
+      console.error('Error communicating with LLM:', error);
+      
+      // Show user-friendly error message
+      let errorText;
+      if (error.message.includes('API key')) {
+        errorText = language === 'EN' 
+          ? "API key not configured. Please check your .env.local file."
+          : "API密钥未配置。请检查您的.env.local文件。";
+      } else if (error.message.includes('401')) {
+        errorText = language === 'EN' 
+          ? "Invalid API key. Please check your credentials."
+          : "无效的API密钥。请检查您的凭证。";
+      } else if (error.message.includes('429')) {
+        errorText = language === 'EN' 
+          ? "Rate limit reached. Please try again in a moment."
+          : "已达到速率限制。请稍后重试。";
+      } else {
+        errorText = language === 'EN' 
+          ? "I'm having trouble connecting right now. Please try again."
+          : "我现在遇到连接问题。请重试。";
+      }
+      
+      const errorMessage = {
+        sender: 'bot',
+        text: errorText,
+        timestamp: new Date().toISOString()
+      };
+      setChatMessages([...updatedMessages, errorMessage]);
+    } finally {
+      setIsLLMTyping(false);
+    }
+  };
+
+  // Handle Enter key press in chat input
+  const handleChatKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  };
 
   const saveToHistory = () => {
     const canvas = canvasRef.current;
@@ -135,7 +253,7 @@ function Canvas({ language, onClose }) {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
     } else if (currentTool === 'eraser') {
-      ctx.strokeStyle = '#FFFFFF';
+      ctx.strokeStyle = '#F5F5F5';
       ctx.globalAlpha = 1;
       ctx.lineWidth = brushSize;
       ctx.lineCap = 'round';
@@ -260,116 +378,87 @@ function Canvas({ language, onClose }) {
     <div className="canvas-container">
       {/* Top Toolbar */}
       <div className="canvas-toolbar">
-        <button className="toolbar-btn" onClick={onClose}>
+        <button className="toolbar-btn home-btn" onClick={onClose}>
           <img src="/element/home.svg" alt="Home" />
         </button>
         
-        <div className="toolbar-actions">
-          <button className="toolbar-btn" onClick={undo} disabled={historyStep === 0}>
-            <img src="/element/undo.svg" alt="Undo" />
-          </button>
-          <button className="toolbar-btn" onClick={redo} disabled={historyStep === history.length - 1}>
-            <img src="/element/redo.svg" alt="Redo" />
-          </button>
+        <div className="toolbar-center">
+          <div className="toolbar-actions">
+            <button className="toolbar-btn" onClick={undo} disabled={historyStep === 0}>
+              <img src="/element/undo.svg" alt="Undo" />
+            </button>
+            <button className="toolbar-btn" onClick={redo} disabled={historyStep === history.length - 1}>
+              <img src="/element/redo.svg" alt="Redo" />
+            </button>
+          </div>
+
+          {/* Progress Indicator */}
+          <div className="progress-indicator">
+            {steps.map((_, idx) => (
+              <div 
+                key={idx} 
+                className={`progress-dash ${idx <= currentStep ? 'completed' : 'remaining'}`}
+              />
+            ))}
+          </div>
         </div>
 
-        {/* Progress Indicator */}
-        <div className="progress-indicator">
-          {steps.map((_, idx) => (
-            <div 
-              key={idx} 
-              className={`progress-dot ${idx <= currentStep ? 'completed' : 'remaining'}`}
-            />
-          ))}
-        </div>
+        <button className="toolbar-btn ai-btn">
+          <img src="/element/robot.svg" alt="AI" />
+        </button>
       </div>
 
       {/* Main Canvas Area */}
       <div className="canvas-main">
-        {/* Drawing Tools Panel */}
-        <div className="tools-panel">
-          <div className="tool-section">
-            <label>{language === 'EN' ? 'Transparency' : '透明度'}</label>
+        {/* Left Sidebar - Vertical Sliders and Tools */}
+        <div className="left-sidebar">
+          <div className="vertical-slider-container">
             <input 
               type="range" 
               min="0" 
               max="100" 
               value={brushOpacity} 
               onChange={(e) => setBrushOpacity(e.target.value)}
-              className="slider"
+              className="vertical-slider"
+              style={{
+                '--slider-value': `${brushOpacity}%`
+              }}
             />
-            <span>{brushOpacity}%</span>
           </div>
-
-          <div className="tool-section">
-            <label>{language === 'EN' ? 'Size' : '大小'}</label>
+          
+          <div className="vertical-slider-container">
             <input 
               type="range" 
               min="1" 
               max="50" 
               value={brushSize} 
               onChange={(e) => setBrushSize(e.target.value)}
-              className="slider"
+              className="vertical-slider"
+              style={{
+                '--slider-value': `${((brushSize - 1) / (50 - 1)) * 100}%`
+              }}
             />
-            <span>{brushSize}px</span>
           </div>
 
-          <div className="tool-buttons">
+          <div className="vertical-tools">
             <button 
-              className={`tool-btn ${currentTool === 'pen' ? 'active' : ''}`}
+              className={`vertical-tool-btn ${currentTool === 'pen' ? 'active' : ''}`}
               onClick={() => setCurrentTool('pen')}
             >
-              <img src="/element/edit.svg" alt="Pen" />
+              <img src="/element/brush.svg" alt="Pen" />
             </button>
             <button 
-              className={`tool-btn ${currentTool === 'fill' ? 'active' : ''}`}
+              className={`vertical-tool-btn ${currentTool === 'fill' ? 'active' : ''}`}
               onClick={() => setCurrentTool('fill')}
             >
               <img src="/element/paint bucket.svg" alt="Fill" />
             </button>
             <button 
-              className={`tool-btn ${currentTool === 'eraser' ? 'active' : ''}`}
+              className={`vertical-tool-btn ${currentTool === 'eraser' ? 'active' : ''}`}
               onClick={() => setCurrentTool('eraser')}
             >
               <img src="/element/eraser.svg" alt="Eraser" />
             </button>
-          </div>
-
-          {/* Color Tools */}
-          <div className="color-section">
-            <button className="tool-btn" onClick={() => setShowColorWheel(true)}>
-              <img src="/element/color-picker.svg" alt="Color Picker" />
-            </button>
-            <button className="tool-btn">
-              <img src="/element/color wheel.svg" alt="Color Wheel" />
-            </button>
-          </div>
-
-          {/* Color Palette */}
-          <div className="color-palette">
-            {colorPalette.map((color, idx) => (
-              <button
-                key={idx}
-                className={`color-swatch ${currentColor === color ? 'active' : ''}`}
-                style={{ backgroundColor: color }}
-                onClick={() => selectColor(color)}
-              />
-            ))}
-          </div>
-
-          {/* Recent Colors */}
-          <div className="recent-colors">
-            <label>{language === 'EN' ? 'Recent' : '最近使用'}</label>
-            <div className="color-palette">
-              {recentColors.slice(0, 8).map((color, idx) => (
-                <button
-                  key={idx}
-                  className="color-swatch"
-                  style={{ backgroundColor: color }}
-                  onClick={() => selectColor(color)}
-                />
-              ))}
-            </div>
           </div>
         </div>
 
@@ -377,70 +466,70 @@ function Canvas({ language, onClose }) {
         <div className="canvas-wrapper">
           <canvas
             ref={canvasRef}
-            width={800}
-            height={600}
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={stopDrawing}
             onMouseLeave={stopDrawing}
             className="drawing-canvas"
           />
-          
-          <button className="next-step-btn" onClick={nextStep}>
-            {language === 'EN' ? 'Next Step' : '下一步'} →
-          </button>
         </div>
 
-        {/* Chat Panel */}
-        <div className={`chat-panel ${chatPanelOpen ? 'open' : 'closed'}`}>
-          <button 
-            className="panel-toggle" 
-            onClick={() => setChatPanelOpen(!chatPanelOpen)}
-          >
-            <img src="/element/sidebar collapse.svg" alt="Toggle" />
+        {/* Bottom Toolbar */}
+        <div className="bottom-toolbar">
+          <div className="bottom-left">
+            <button className="bottom-tool-btn">
+              <img src="/element/brush.svg" alt="Brush" />
+            </button>
+            <button className="bottom-tool-btn" onClick={() => setShowColorWheel(true)}>
+              <img src="/element/color wheel.svg" alt="Color Wheel" />
+            </button>
+          </div>
+
+          <div className="bottom-center">
+            <div className="brush-size-slider-container">
+              <input 
+                type="range" 
+                min="1" 
+                max="50" 
+                value={brushSize} 
+                onChange={(e) => setBrushSize(e.target.value)}
+                className="brush-size-slider"
+              />
+            </div>
+            <div className="color-palette-bottom">
+              {colorPalette.map((color, idx) => (
+                <button
+                  key={idx}
+                  className={`color-swatch-bottom ${currentColor === color ? 'active' : ''} ${color === '#FFFFFF' ? 'white-color' : ''}`}
+                  style={{ backgroundColor: color }}
+                  onClick={() => selectColor(color)}
+                />
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+        {/* Right Bottom Buttons - Above Bottom Toolbar */}
+        <div className="right-bottom-buttons">
+          <button className="bottom-tool-btn">
+            <img src="/element/play.svg" alt="Play" />
           </button>
-
-          {chatPanelOpen && (
-            <>
-              <div className="module-info">
-                <h3 className="module-title">
-                  {language === 'EN' ? steps[currentStep].titleEN : steps[currentStep].titleCN}
-                </h3>
-                <p className="module-instruction">
-                  {language === 'EN' ? steps[currentStep].descriptionEN : steps[currentStep].descriptionCN}
-                </p>
-              </div>
-
-              <div className="chat-messages">
-                {chatMessages.map((msg, idx) => (
-                  <div key={idx} className="chat-message bot">
-                    {language === 'EN' ? msg.textEN : msg.textCN}
-                  </div>
-                ))}
-              </div>
-
-              <div className="chat-controls">
-                <button 
-                  className={`control-btn ${showAudioInput ? 'active' : ''}`}
-                  onClick={() => setShowAudioInput(!showAudioInput)}
-                >
-                  <img src="/element/microphone.svg" alt="Audio" />
-                </button>
-                <button 
-                  className="control-btn"
-                  onClick={() => setShowTextInput(true)}
-                >
-                  <img src="/element/keyboard.svg" alt="Text" />
-                </button>
-                <button 
-                  className={`control-btn ${isMuted ? 'active' : ''}`}
-                  onClick={() => setIsMuted(!isMuted)}
-                >
-                  <img src={isMuted ? "/element/mute.svg" : "/element/unmute.svg"} alt="Mute" />
-                </button>
-              </div>
-            </>
-          )}
+          <button className="bottom-tool-btn">
+            <img src="/element/upload.svg" alt="Upload" />
+          </button>
+          <button className="bottom-tool-btn">
+            <img src="/element/delete.svg" alt="Delete" />
+          </button>
+          <button className="bottom-tool-btn microphone-btn">
+            <img src="/element/microphone.svg" alt="Microphone" />
+          </button>
+          <button className="bottom-tool-btn" onClick={() => setShowTextInput(true)}>
+            <img src="/element/keyboard.svg" alt="Keyboard" />
+          </button>
+          <button className="bottom-tool-btn" onClick={() => setIsMuted(!isMuted)}>
+            <img src={isMuted ? "/element/mute.svg" : "/element/unmute.svg"} alt="Mute" />
+          </button>
         </div>
       </div>
 
