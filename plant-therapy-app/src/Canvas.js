@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import './Canvas.css';
 import llmService from './llmService';
 
@@ -138,6 +138,9 @@ function Canvas({ language, onClose }) {
   
   // Store colored SVGs for each step (to preserve colors when switching steps)
   const coloredSvgsRef = useRef({});
+  
+  // Use ref to track if initial SVGs are drawn to avoid dependency issues
+  const initialDrawnRef = useRef(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -204,7 +207,11 @@ function Canvas({ language, onClose }) {
           });
           
           set2Drawn = true;
-          saveToHistory();
+          initialDrawnRef.current = true;
+          // Save initial state to history
+          const newHistory = [canvas.toDataURL()];
+          setHistory(newHistory);
+          setHistoryStep(0);
         }
       };
       
@@ -263,7 +270,11 @@ function Canvas({ language, onClose }) {
           newCtx.fillRect(0, 0, canvas.width, canvas.height);
           // Draw the old content
           newCtx.drawImage(img, 0, 0, oldWidth, oldHeight, 0, 0, oldWidth, oldHeight);
-          saveToHistory();
+          // Save to history after resize
+          const newHistory = history.slice(0, historyStep + 1);
+          newHistory.push(canvas.toDataURL());
+          setHistory(newHistory);
+          setHistoryStep(newHistory.length - 1);
         };
         img.src = currentImage;
       };
@@ -274,6 +285,7 @@ function Canvas({ language, onClose }) {
         window.removeEventListener('resize', resizeCanvas);
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language]);
 
   // Effect to draw the appropriate SVG when step changes
@@ -385,6 +397,7 @@ function Canvas({ language, onClose }) {
     newHistory.push(canvas.toDataURL());
     setHistory(newHistory);
     setHistoryStep(newHistory.length - 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, steps]);
 
   // Initialize chat messages - empty array so no welcome message repeats the title
