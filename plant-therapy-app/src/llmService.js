@@ -52,9 +52,14 @@ Current stage: {stage}`,
   // Get system prompt based on language and current stage
   getSystemPrompt(language, stage) {
     const stageNames = {
-      0: language === 'EN' ? 'roots (origins and foundations)' : '根（起源与基础）',
-      1: language === 'EN' ? 'trunk (strengths and skills)' : '树干（优势与技能）',
-      2: language === 'EN' ? 'branches (hopes and dreams)' : '枝条（希望与梦想）'
+      0: language === 'EN' ? 'introduction' : '介绍',
+      1: language === 'EN' ? 'roots (origins and foundations)' : '根（起源与基础）',
+      2: language === 'EN' ? 'trunk (strengths and skills)' : '树干（优势与技能）',
+      3: language === 'EN' ? 'branches (hopes and dreams)' : '枝条（希望与梦想）',
+      4: language === 'EN' ? 'leaves (relationships and connections)' : '树叶（关系与联系）',
+      5: language === 'EN' ? 'fruits/flowers (achievements)' : '果实/花朵（成就）',
+      6: language === 'EN' ? 'bugs (worries and imperfections)' : '虫子（担忧与不完美）',
+      7: language === 'EN' ? 'storms (challenges and changes)' : '风暴（挑战与变化）'
     };
     
     const prompt = language === 'EN' ? this.systemPrompt.en : this.systemPrompt.cn;
