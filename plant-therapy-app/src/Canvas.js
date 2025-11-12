@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import './Canvas.css';
 import llmService from './llmService';
 
@@ -13,8 +13,6 @@ function Canvas({ language, onClose }) {
   const [recentColors, setRecentColors] = useState(['#EA5851']);
   const [showColorWheel, setShowColorWheel] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
-  // Audio input functionality to be implemented in future
-  const [showAudioInput] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [chatPanelOpen, setChatPanelOpen] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
@@ -42,7 +40,7 @@ function Canvas({ language, onClose }) {
     '#CCCCCC'
   ];
 
-  const steps = [
+  const steps = useMemo(() => [
     {
       stepNumber: 0,
       titleEN: 'Tree of Life',
@@ -131,7 +129,7 @@ function Canvas({ language, onClose }) {
       exampleImage: '/canvas/example/07 STORM.png',
       svgIndex: 6
     }
-  ];
+  ], []);
 
   // Store loaded SVG images in refs so they persist across re-renders
   const svgImagesSet1Ref = useRef([]);
@@ -140,6 +138,17 @@ function Canvas({ language, onClose }) {
   
   // Store colored SVGs for each step (to preserve colors when switching steps)
   const coloredSvgsRef = useRef({});
+
+  // Define saveToHistory function before useEffect hooks
+  const saveToHistory = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const newHistory = history.slice(0, historyStep + 1);
+      newHistory.push(canvas.toDataURL());
+      setHistory(newHistory);
+      setHistoryStep(newHistory.length - 1);
+    }
+  }, [history, historyStep]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -466,16 +475,6 @@ function Canvas({ language, onClose }) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendChatMessage();
-    }
-  };
-
-  const saveToHistory = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const newHistory = history.slice(0, historyStep + 1);
-      newHistory.push(canvas.toDataURL());
-      setHistory(newHistory);
-      setHistoryStep(newHistory.length - 1);
     }
   };
 
@@ -946,25 +945,6 @@ function Canvas({ language, onClose }) {
   }
 
   const currentStepData = steps[currentStep] || {};
-
-  // Sample data for future implementation
-  const _sampleRoots = [
-    {
-      color: '#B78A60',
-      entriesEN: ['Faith', 'Mom', 'Grandfather', 'Family'],
-      entriesCN: ['信仰', '妈妈', '外公', '家人']
-    },
-    {
-      color: '#F3A6C4',
-      entriesEN: ['Hometown', 'Piano', 'My students'],
-      entriesCN: ['家乡', '钢琴', '我的学生']
-    },
-    {
-      color: '#F1C453',
-      entriesEN: ['My 3 cats: Bella, Juniper, Kiki', 'My friend Lina'],
-      entriesCN: ['我的三只猫：贝拉、杜松、琪琪', '朋友丽娜']
-    }
-  ];
 
   const renderTextWithBreaks = (text = '') => {
     const lines = text.split('\n');
