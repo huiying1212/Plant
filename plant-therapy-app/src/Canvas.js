@@ -139,17 +139,6 @@ function Canvas({ language, onClose }) {
   // Store colored SVGs for each step (to preserve colors when switching steps)
   const coloredSvgsRef = useRef({});
 
-  // Define saveToHistory function before useEffect hooks
-  const saveToHistory = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const newHistory = history.slice(0, historyStep + 1);
-      newHistory.push(canvas.toDataURL());
-      setHistory(newHistory);
-      setHistoryStep(newHistory.length - 1);
-    }
-  }, [history, historyStep]);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -285,13 +274,15 @@ function Canvas({ language, onClose }) {
         window.removeEventListener('resize', resizeCanvas);
       };
     }
-  }, [language, saveToHistory]);
+  }, [language]);
 
   // Effect to draw the appropriate SVG when step changes
   useEffect(() => {
     if (!svgsLoadedRef.current) return;
     
     const canvas = canvasRef.current;
+    if (!canvas) return;
+    
     const ctx = canvas.getContext('2d');
     
     // First, redraw the base canvas with the background
@@ -389,8 +380,12 @@ function Canvas({ language, onClose }) {
       }
     }
     
-    saveToHistory();
-  }, [currentStep, saveToHistory, steps]);
+    // Only save to history on step change, not on every render
+    const newHistory = history.slice(0, historyStep + 1);
+    newHistory.push(canvas.toDataURL());
+    setHistory(newHistory);
+    setHistoryStep(newHistory.length - 1);
+  }, [currentStep, steps]);
 
   // Initialize chat messages - empty array so no welcome message repeats the title
   useEffect(() => {
@@ -403,6 +398,16 @@ function Canvas({ language, onClose }) {
       chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages]);
+
+  const saveToHistory = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const newHistory = history.slice(0, historyStep + 1);
+      newHistory.push(canvas.toDataURL());
+      setHistory(newHistory);
+      setHistoryStep(newHistory.length - 1);
+    }
+  };
 
   // Send message to LLM
   const sendChatMessage = async () => {
