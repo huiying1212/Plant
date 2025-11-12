@@ -110,6 +110,9 @@ Current stage: {stage}`,
 
 }
 
-// Export singleton instance
-export default new LLMService();
+// Create singleton instance
+const llmServiceInstance = new LLMService();
+
+// Export the instance
+export default llmServiceInstance;
 

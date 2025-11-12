@@ -13,7 +13,8 @@ function Canvas({ language, onClose }) {
   const [recentColors, setRecentColors] = useState(['#EA5851']);
   const [showColorWheel, setShowColorWheel] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
-  const [showAudioInput, setShowAudioInput] = useState(false);
+  // Audio input functionality to be implemented in future
+  const [showAudioInput] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [chatPanelOpen, setChatPanelOpen] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
@@ -275,7 +276,7 @@ function Canvas({ language, onClose }) {
         window.removeEventListener('resize', resizeCanvas);
       };
     }
-  }, [language]);
+  }, [language, saveToHistory]);
 
   // Effect to draw the appropriate SVG when step changes
   useEffect(() => {
@@ -380,7 +381,7 @@ function Canvas({ language, onClose }) {
     }
     
     saveToHistory();
-  }, [currentStep]);
+  }, [currentStep, saveToHistory, steps]);
 
   // Initialize chat messages - empty array so no welcome message repeats the title
   useEffect(() => {
@@ -946,7 +947,8 @@ function Canvas({ language, onClose }) {
 
   const currentStepData = steps[currentStep] || {};
 
-  const sampleRoots = [
+  // Sample data for future implementation
+  const _sampleRoots = [
     {
       color: '#B78A60',
       entriesEN: ['Faith', 'Mom', 'Grandfather', 'Family'],
