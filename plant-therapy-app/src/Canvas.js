@@ -6,10 +6,12 @@ function Canvas({ language, onClose }) {
   const canvasRef = useRef(null);
   const chatMessagesEndRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [currentTool, setCurrentTool] = useState('pen'); // pen, fill, eraser
+  const [currentTool, setCurrentTool] = useState('pen'); // pen, fill, eraser, text
   const [brushSize, setBrushSize] = useState(5);
   const [brushOpacity, setBrushOpacity] = useState(100);
   const [currentColor, setCurrentColor] = useState('#EA5851');
+  const [baseColor, setBaseColor] = useState('#EA5851');
+  const [colorBrightness, setColorBrightness] = useState(50);
   const [recentColors, setRecentColors] = useState(['#EA5851']);
   const [showColorWheel, setShowColorWheel] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
@@ -18,6 +20,9 @@ function Canvas({ language, onClose }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [textInputValue, setTextInputValue] = useState('');
   const [canvasTexts, setCanvasTexts] = useState([]);
+  const [draggingTextIndex, setDraggingTextIndex] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [hoveringTextIndex, setHoveringTextIndex] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyStep, setHistoryStep] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -297,6 +302,9 @@ function Canvas({ language, onClose }) {
     
     const ctx = canvas.getContext('2d');
     
+    // Reset globalAlpha to ensure SVGs are drawn with full opacity
+    ctx.globalAlpha = 1;
+    
     // First, redraw the base canvas with the background
     ctx.fillStyle = '#F5F5F5';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -400,10 +408,24 @@ function Canvas({ language, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, steps]);
 
-  // Initialize chat messages - empty array so no welcome message repeats the title
+  // Initialize chat messages with first step guidance
   useEffect(() => {
-    setChatMessages([]);
-  }, [currentStep, language]);
+    // Add initial guidance when starting or language changes
+    if (currentStep === 0) {
+      const initialStepData = steps[0];
+      const initialMessages = [
+        {
+          sender: 'bot',
+          text: language === 'EN'
+            ? `${initialStepData.instructionEN}\n\n${initialStepData.descriptionEN}`
+            : `${initialStepData.instructionCN}\n\n${initialStepData.descriptionCN}`,
+          timestamp: new Date().toISOString()
+        }
+      ];
+      setChatMessages(initialMessages);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -411,6 +433,46 @@ function Canvas({ language, onClose }) {
       chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages]);
+
+  // Function to redraw canvas with base content and texts
+  const redrawCanvasWithTexts = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    // First restore the base canvas from history (without texts)
+    if (history.length > 0 && historyStep >= 0) {
+      const img = new Image();
+      img.src = history[historyStep];
+      img.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        
+        // Then draw all text elements on top
+        canvasTexts.forEach((textObj) => {
+          ctx.font = `${textObj.fontSize || 24}px Avenir, sans-serif`;
+          ctx.fillStyle = textObj.color;
+          ctx.textBaseline = 'top';
+          ctx.fillText(textObj.text, textObj.x, textObj.y);
+        });
+      };
+    } else {
+      // Just draw texts if no history
+      canvasTexts.forEach((textObj) => {
+        ctx.font = `${textObj.fontSize || 24}px Avenir, sans-serif`;
+        ctx.fillStyle = textObj.color;
+        ctx.textBaseline = 'top';
+        ctx.fillText(textObj.text, textObj.x, textObj.y);
+      });
+    }
+  };
+
+  // Redraw texts when canvasTexts changes or when dragging
+  useEffect(() => {
+    redrawCanvasWithTexts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasTexts, historyStep]);
 
   const saveToHistory = () => {
     const canvas = canvasRef.current;
@@ -498,29 +560,15 @@ function Canvas({ language, onClose }) {
 
   const undo = () => {
     if (historyStep > 0) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      img.src = history[historyStep - 1];
-      img.onload = () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        setHistoryStep(historyStep - 1);
-      };
+      setHistoryStep(historyStep - 1);
+      // The useEffect watching historyStep will handle redrawing
     }
   };
 
   const redo = () => {
     if (historyStep < history.length - 1) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      img.src = history[historyStep + 1];
-      img.onload = () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        setHistoryStep(historyStep + 1);
-      };
+      setHistoryStep(historyStep + 1);
+      // The useEffect watching historyStep will handle redrawing
     }
   };
 
@@ -531,6 +579,9 @@ function Canvas({ language, onClose }) {
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
+    
+    // Reset globalAlpha to ensure SVGs are drawn with full opacity
+    ctx.globalAlpha = 1;
     
     // Clear canvas and redraw base tree except for the current step's SVG
     ctx.fillStyle = '#F5F5F5';
@@ -703,6 +754,34 @@ function Canvas({ language, onClose }) {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    // Check if clicking on a text element for dragging
+    const ctx = canvas.getContext('2d');
+    let clickedTextIndex = -1;
+    
+    for (let i = canvasTexts.length - 1; i >= 0; i--) {
+      const textObj = canvasTexts[i];
+      ctx.font = `${textObj.fontSize || 24}px Avenir, sans-serif`;
+      const metrics = ctx.measureText(textObj.text);
+      const textWidth = metrics.width;
+      const textHeight = textObj.fontSize || 24;
+      
+      if (x >= textObj.x && x <= textObj.x + textWidth &&
+          y >= textObj.y && y <= textObj.y + textHeight) {
+        clickedTextIndex = i;
+        break;
+      }
+    }
+    
+    if (clickedTextIndex !== -1) {
+      // Start dragging text
+      setDraggingTextIndex(clickedTextIndex);
+      setDragOffset({
+        x: x - canvasTexts[clickedTextIndex].x,
+        y: y - canvasTexts[clickedTextIndex].y
+      });
+      return;
+    }
+    
     // If using fill tool, fill the current step's SVG and return
     if (currentTool === 'fill') {
       fillCurrentStepSvg(currentColor);
@@ -710,7 +789,6 @@ function Canvas({ language, onClose }) {
     }
     
     setIsDrawing(true);
-    const ctx = canvas.getContext('2d');
     ctx.beginPath();
     ctx.moveTo(x, y);
     
@@ -731,6 +809,9 @@ function Canvas({ language, onClose }) {
       
       // Redraw base canvas and SVGs
       const redrawCanvas = () => {
+        // Reset globalAlpha to ensure SVGs are drawn with full opacity
+        ctx.globalAlpha = 1;
+        
         // Clear canvas
         ctx.fillStyle = '#F5F5F5';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -843,12 +924,47 @@ function Canvas({ language, onClose }) {
   };
 
   const draw = (e) => {
-    if (!isDrawing) return;
-    
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    
+    // Handle text dragging
+    if (draggingTextIndex !== null) {
+      const newTexts = [...canvasTexts];
+      newTexts[draggingTextIndex] = {
+        ...newTexts[draggingTextIndex],
+        x: x - dragOffset.x,
+        y: y - dragOffset.y
+      };
+      setCanvasTexts(newTexts);
+      return;
+    }
+    
+    // Check if hovering over text (when not drawing)
+    if (!isDrawing) {
+      const ctx = canvas.getContext('2d');
+      let hoveredTextIndex = null;
+      
+      for (let i = canvasTexts.length - 1; i >= 0; i--) {
+        const textObj = canvasTexts[i];
+        ctx.font = `${textObj.fontSize || 24}px Avenir, sans-serif`;
+        const metrics = ctx.measureText(textObj.text);
+        const textWidth = metrics.width;
+        const textHeight = textObj.fontSize || 24;
+        
+        if (x >= textObj.x && x <= textObj.x + textWidth &&
+            y >= textObj.y && y <= textObj.y + textHeight) {
+          hoveredTextIndex = i;
+          break;
+        }
+      }
+      
+      if (hoveredTextIndex !== hoveringTextIndex) {
+        setHoveringTextIndex(hoveredTextIndex);
+      }
+      return;
+    }
     
     const ctx = canvas.getContext('2d');
     ctx.lineTo(x, y);
@@ -856,8 +972,21 @@ function Canvas({ language, onClose }) {
   };
 
   const stopDrawing = () => {
+    // Handle end of text dragging - don't save to history
+    if (draggingTextIndex !== null) {
+      setDraggingTextIndex(null);
+      return;
+    }
+    
     if (isDrawing) {
       setIsDrawing(false);
+      
+      // Reset globalAlpha to prevent affecting subsequent drawing operations
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.globalAlpha = 1;
+      }
       
       // If we were using the eraser, make sure SVGs are redrawn
       if (currentTool === 'eraser') {
@@ -869,35 +998,114 @@ function Canvas({ language, onClose }) {
     }
   };
 
+  // Convert hex to RGB
+  const hexToRgb = (hex) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return [r, g, b];
+  };
+
+  // Convert RGB to hex
+  const rgbToHex = (r, g, b) => {
+    return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`;
+  };
+
+  // Adjust brightness of a color (0 = black, 50 = original, 100 = white)
+  const adjustBrightness = (color, brightness) => {
+    const [r, g, b] = hexToRgb(color);
+    const factor = brightness / 50; // 50 is the middle point (original color)
+    
+    let newR, newG, newB;
+    
+    if (factor <= 1) {
+      // Darken the color (0-50 range)
+      newR = r * factor;
+      newG = g * factor;
+      newB = b * factor;
+    } else {
+      // Lighten the color (50-100 range)
+      const lightenFactor = factor - 1;
+      newR = r + (255 - r) * lightenFactor;
+      newG = g + (255 - g) * lightenFactor;
+      newB = b + (255 - b) * lightenFactor;
+    }
+    
+    return rgbToHex(newR, newG, newB);
+  };
+
   const selectColor = (color) => {
     setCurrentColor(color);
+    setBaseColor(color);
+    setColorBrightness(50); // Reset brightness to middle when selecting new color
     if (!recentColors.includes(color)) {
       setRecentColors([color, ...recentColors.slice(0, 7)]);
     }
   };
 
+  const handleBrightnessChange = (brightness) => {
+    setColorBrightness(brightness);
+    const adjustedColor = adjustBrightness(baseColor, brightness);
+    setCurrentColor(adjustedColor);
+  };
+
   const addTextToCanvas = () => {
     if (textInputValue.trim()) {
-      setCanvasTexts([...canvasTexts, {
-        text: textInputValue,
-        x: 100,
-        y: 100 + canvasTexts.length * 30
-      }]);
-      
       const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      ctx.font = '16px Avenir, sans-serif';
-      ctx.fillStyle = currentColor;
-      ctx.fillText(textInputValue, 100, 100 + canvasTexts.length * 30);
+      
+      // Add text near the center of the canvas
+      const newText = {
+        text: textInputValue,
+        x: canvas.width / 2 - 100,
+        y: canvas.height / 2 + canvasTexts.length * 40,
+        color: currentColor,
+        fontSize: 24
+      };
+      
+      setCanvasTexts([...canvasTexts, newText]);
       
       setTextInputValue('');
       setShowTextInput(false);
-      saveToHistory();
     }
   };
 
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
+      // Add step transition and guidance messages to chat history
+      const nextStepIndex = currentStep + 1;
+      const nextStepData = steps[nextStepIndex];
+      
+      const stepTransitionMessage = {
+        sender: 'system',
+        text: language === 'EN' 
+          ? `━━━ ${nextStepData.titleEN} ━━━`
+          : `━━━ ${nextStepData.titleCN} ━━━`,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Add the step instruction as a bot message
+      const instructionMessage = {
+        sender: 'bot',
+        text: language === 'EN'
+          ? `${nextStepData.instructionEN}\n\n${nextStepData.descriptionEN}`
+          : `${nextStepData.instructionCN}\n\n${nextStepData.descriptionCN}`,
+        timestamp: new Date().toISOString()
+      };
+      
+      const messages = [stepTransitionMessage, instructionMessage];
+      
+      // Add example image as a message if available
+      if (nextStepData.exampleImage) {
+        const exampleMessage = {
+          sender: 'bot',
+          text: language === 'EN' ? 'Example:' : '示例：',
+          timestamp: new Date().toISOString(),
+          image: nextStepData.exampleImage
+        };
+        messages.push(exampleMessage);
+      }
+      
+      setChatMessages(prevMessages => [...prevMessages, ...messages]);
       setCurrentStep(currentStep + 1);
     } else {
       setIsCompleted(true);
@@ -1020,20 +1228,6 @@ function Canvas({ language, onClose }) {
           <div className="vertical-slider-container">
             <input 
               type="range" 
-              min="0" 
-              max="100" 
-              value={brushOpacity} 
-              onChange={(e) => setBrushOpacity(e.target.value)}
-              className="vertical-slider"
-              style={{
-                '--slider-value': `${brushOpacity}%`
-              }}
-            />
-          </div>
-          
-          <div className="vertical-slider-container">
-            <input 
-              type="range" 
               min="1" 
               max="50" 
               value={brushSize} 
@@ -1041,6 +1235,20 @@ function Canvas({ language, onClose }) {
               className="vertical-slider"
               style={{
                 '--slider-value': `${((brushSize - 1) / (50 - 1)) * 100}%`
+              }}
+            />
+          </div>
+          
+          <div className="vertical-slider-container">
+            <input 
+              type="range" 
+              min="0" 
+              max="100" 
+              value={brushOpacity} 
+              onChange={(e) => setBrushOpacity(e.target.value)}
+              className="vertical-slider"
+              style={{
+                '--slider-value': `${brushOpacity}%`
               }}
             />
           </div>
@@ -1064,6 +1272,15 @@ function Canvas({ language, onClose }) {
             >
               <img src="/element/eraser.svg" alt="Eraser" />
             </button>
+            <button 
+              className={`vertical-tool-btn ${currentTool === 'text' ? 'active' : ''}`}
+              onClick={() => {
+                setCurrentTool('text');
+                setShowTextInput(true);
+              }}
+            >
+              <img src="/element/keyboard.svg" alt="Text" />
+            </button>
           </div>
         </div>
 
@@ -1076,6 +1293,11 @@ function Canvas({ language, onClose }) {
             onMouseUp={stopDrawing}
             onMouseLeave={stopDrawing}
             className="drawing-canvas"
+            style={{ 
+              cursor: draggingTextIndex !== null ? 'grabbing' : 
+                     hoveringTextIndex !== null ? 'grab' : 
+                     'crosshair' 
+            }}
           />
         </div>
 
@@ -1083,7 +1305,7 @@ function Canvas({ language, onClose }) {
         <div className="bottom-toolbar">
           <div className="bottom-left">
             <button className="bottom-tool-btn">
-              <img src="/element/brush.svg" alt="Brush" />
+              <img src="/element/color picker.svg" alt="Color Picker" />
             </button>
             <button className="bottom-tool-btn" onClick={() => setShowColorWheel(true)}>
               <img src="/element/color wheel.svg" alt="Color Wheel" />
@@ -1091,14 +1313,18 @@ function Canvas({ language, onClose }) {
           </div>
 
           <div className="bottom-center">
-            <div className="brush-size-slider-container">
+            <div className="color-brightness-slider-container">
               <input 
                 type="range" 
-                min="1" 
-                max="50" 
-                value={brushSize} 
-                onChange={(e) => setBrushSize(e.target.value)}
-                className="brush-size-slider"
+                min="0" 
+                max="100" 
+                value={colorBrightness} 
+                onChange={(e) => handleBrightnessChange(e.target.value)}
+                className="color-brightness-slider"
+                style={{
+                  background: `linear-gradient(to right, #000000, ${baseColor}, #ffffff)`,
+                  verticalAlign: 'middle'
+                }}
               />
             </div>
             <div className="color-palette-bottom">
@@ -1117,20 +1343,28 @@ function Canvas({ language, onClose }) {
 
         {/* Right Bottom Buttons - Above Bottom Toolbar */}
         <div className="right-bottom-buttons">
-          <button className="bottom-tool-btn">
-            <img src="/element/play.svg" alt="Play" />
-          </button>
-          <button className="bottom-tool-btn">
-            <img src="/element/upload.svg" alt="Upload" />
-          </button>
-          <button className="bottom-tool-btn">
-            <img src="/element/delete.svg" alt="Delete" />
-          </button>
+          {/* Next Step Button */}
+          {currentStep < steps.length - 1 && (
+            <button 
+              type="button"
+              className="next-step-btn-floating"
+              onClick={nextStep}
+            >
+              {language === 'EN' ? 'Next Step' : '下一步'}
+            </button>
+          )}
+          {currentStep === steps.length - 1 && (
+            <button 
+              type="button"
+              className="next-step-btn-floating complete-btn"
+              onClick={nextStep}
+            >
+              {language === 'EN' ? 'Complete' : '完成'}
+            </button>
+          )}
+          
           <button className="bottom-tool-btn microphone-btn">
             <img src="/element/microphone.svg" alt="Microphone" />
-          </button>
-          <button className="bottom-tool-btn" onClick={() => setShowTextInput(true)}>
-            <img src="/element/keyboard.svg" alt="Keyboard" />
           </button>
           <button className="bottom-tool-btn" onClick={() => setIsMuted(!isMuted)}>
             <img src={isMuted ? "/element/mute.svg" : "/element/unmute.svg"} alt="Mute" />
@@ -1228,28 +1462,6 @@ function Canvas({ language, onClose }) {
         </div>
 
         <div className="chat-panel-content">
-          <div className="chat-guidance-card">
-            <p className="chat-guidance-body">
-              {language === 'EN'
-                ? renderTextWithBreaks(currentStepData.descriptionEN)
-                : renderTextWithBreaks(currentStepData.descriptionCN)}
-            </p>
-          </div>
-
-          {/* Show example image if available */}
-          {currentStepData.exampleImage && (
-            <div className="chat-example-image">
-              <p className="chat-example-label">
-                {language === 'EN' ? 'Example:' : '示例：'}
-              </p>
-              <img 
-                src={currentStepData.exampleImage} 
-                alt={language === 'EN' ? 'Example' : '示例'}
-                className="example-image"
-              />
-                  </div>
-          )}
-
           <div className="chat-messages">
             {chatMessages.map((message, idx) => (
               <div
@@ -1258,6 +1470,13 @@ function Canvas({ language, onClose }) {
               >
                 <div className="chat-bubble">
                   {renderTextWithBreaks(message.text)}
+                  {message.image && (
+                    <img 
+                      src={message.image} 
+                      alt={message.text}
+                      className="chat-message-image"
+                    />
+                  )}
                 </div>
                 <span className="chat-timestamp">
                   {new Date(message.timestamp).toLocaleTimeString([], {
@@ -1281,26 +1500,6 @@ function Canvas({ language, onClose }) {
         </div>
 
         <div className="chat-panel-footer">
-          {/* Next Step Button */}
-          {currentStep < steps.length - 1 && (
-            <button 
-              type="button"
-              className="next-step-btn"
-              onClick={nextStep}
-            >
-              {language === 'EN' ? 'Next Step' : '下一步'}
-            </button>
-          )}
-          {currentStep === steps.length - 1 && (
-            <button 
-              type="button"
-              className="next-step-btn complete-btn"
-              onClick={nextStep}
-            >
-              {language === 'EN' ? 'Complete' : '完成'}
-            </button>
-          )}
-          
           <div className="chat-input-wrapper">
             <textarea
               value={chatInput}
@@ -1319,28 +1518,6 @@ function Canvas({ language, onClose }) {
               disabled={!chatInput.trim() || isLLMTyping}
             >
               <img src="/element/forward.svg" alt="Send" />
-            </button>
-          </div>
-          <div className="chat-footer-tools">
-            <button type="button" className="chat-footer-btn">
-              <img src="/element/microphone.svg" alt="Microphone" />
-            </button>
-            <button
-              type="button"
-              className="chat-footer-btn"
-              onClick={() => setShowTextInput(true)}
-            >
-              <img src="/element/keyboard.svg" alt="Keyboard" />
-            </button>
-            <button
-              type="button"
-              className="chat-footer-btn"
-              onClick={() => setIsMuted((prev) => !prev)}
-            >
-              <img
-                src={isMuted ? '/element/mute.svg' : '/element/unmute.svg'}
-                alt={isMuted ? 'Muted' : 'Unmuted'}
-              />
             </button>
           </div>
         </div>
