@@ -501,7 +501,7 @@ function Canvas({ language, onClose }) {
     setIsLLMTyping(true);
 
     try {
-      // Get LLM response from GPT-5
+      // Get LLM response
       const llmResponse = await llmService.sendMessage(
         updatedMessages,
         language,

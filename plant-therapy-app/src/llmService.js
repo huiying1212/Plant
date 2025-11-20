@@ -3,10 +3,13 @@
 
 class LLMService {
   constructor() {
-    // Configuration - you can store API key in environment variables
+    // Configuration
+    // For local development: uses REACT_APP_OPENAI_API_KEY from .env.local
+    // For production (Vercel): uses /api/chat serverless function proxy
+    this.useProxy = process.env.NODE_ENV === 'production' || process.env.REACT_APP_USE_PROXY === 'true';
     this.apiKey = process.env.REACT_APP_OPENAI_API_KEY || '';
-    this.apiEndpoint = 'https://api.openai.com/v1/chat/completions';
-    this.model = 'gpt-5';
+    this.apiEndpoint = this.useProxy ? '/api/chat' : 'https://api.openai.com/v1/chat/completions';
+    this.model = process.env.REACT_APP_OPENAI_MODEL || 'gpt-4-turbo';
     
     // System prompt for Tree of Life therapy context
     this.systemPrompt = {
@@ -68,32 +71,55 @@ Current stage: {stage}`,
 
   // Send message to LLM and get response
   async sendMessage(messages, language = 'EN', currentStep = 0) {
-    if (!this.apiKey) {
+    // Check API key only if not using proxy
+    if (!this.useProxy && !this.apiKey) {
       throw new Error('API key is not configured. Please add REACT_APP_OPENAI_API_KEY to your .env.local file');
     }
 
     try {
       const systemPrompt = this.getSystemPrompt(language, currentStep);
       
-      const response = await fetch(this.apiEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...messages.map(msg => ({
-              role: msg.sender === 'user' ? 'user' : 'assistant',
-              content: msg.text
-            }))
-          ],
-          temperature: 0.7,
-          max_tokens: 300
-        })
-      });
+      // Prepare messages
+      const allMessages = [
+        { role: 'system', content: systemPrompt },
+        ...messages.map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.text
+        }))
+      ];
+
+      let response;
+      
+      if (this.useProxy) {
+        // Use proxy endpoint (for Vercel production)
+        response = await fetch(this.apiEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            messages: allMessages,
+            requestedModel: this.model,
+            temperature: 0.7,
+            max_tokens: 300
+          })
+        });
+      } else {
+        // Direct API call (for local development)
+        response = await fetch(this.apiEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          },
+          body: JSON.stringify({
+            model: this.model,
+            messages: allMessages,
+            temperature: 0.7,
+            max_tokens: 300
+          })
+        });
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
