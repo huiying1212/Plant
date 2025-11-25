@@ -448,16 +448,28 @@
 }
 
 .bottom-tool-btn.microphone-btn {
-  background-color: #87B26B;
   width: 48px;
   height: 48px;
 }
 
-.bottom-tool-btn.microphone-btn img {
+.bottom-tool-btn.speaker-btn {
+  width: 48px;
+  height: 48px;
+}
+
+/* Active state for microphone and speaker buttons */
+.bottom-tool-btn.microphone-btn.active,
+.bottom-tool-btn.speaker-btn.active {
+  background-color: #87B26B;
+}
+
+.bottom-tool-btn.microphone-btn.active img,
+.bottom-tool-btn.speaker-btn.active img {
   filter: brightness(0) invert(1);
 }
 
-.bottom-tool-btn.microphone-btn:hover {
+.bottom-tool-btn.microphone-btn.active:hover,
+.bottom-tool-btn.speaker-btn.active:hover {
   background-color: #6fa054;
 }
 
@@ -1101,6 +1113,44 @@
 .next-step-btn-floating.complete-btn:hover {
   background: #d94842;
   box-shadow: 0 6px 20px rgba(234, 88, 81, 0.5);
+}
+
+.next-step-btn-floating.reedit-btn {
+  background: #FFFFFF;
+  color: #87B26B;
+  border: 2px solid #87B26B;
+  box-shadow: 0 4px 16px rgba(135, 178, 107, 0.2);
+}
+
+.next-step-btn-floating.reedit-btn:hover {
+  background: #F7FBF3;
+  box-shadow: 0 6px 20px rgba(135, 178, 107, 0.3);
+}
+
+.next-step-btn-floating.loading {
+  cursor: wait;
+  opacity: 0.9;
+}
+
+.next-step-btn-floating .spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #FFFFFF;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .chat-input-wrapper {

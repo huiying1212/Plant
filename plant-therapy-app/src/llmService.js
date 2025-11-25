@@ -9,7 +9,8 @@ class LLMService {
     this.useProxy = process.env.NODE_ENV === 'production' || process.env.REACT_APP_USE_PROXY === 'true';
     this.apiKey = process.env.REACT_APP_OPENAI_API_KEY || '';
     this.apiEndpoint = this.useProxy ? '/api/chat' : 'https://api.openai.com/v1/chat/completions';
-    this.model = process.env.REACT_APP_OPENAI_MODEL || 'gpt-4-turbo';
+    // Use gpt-4o by default as it supports vision
+    this.model = process.env.REACT_APP_OPENAI_MODEL || 'gpt-4o';
     
     // System prompt for Tree of Life therapy context
     this.systemPrompt = {
@@ -20,15 +21,19 @@ The Tree of Life is a narrative-based activity where people draw a tree to repre
 - Trunk: strengths, skills, what keeps them standing strong
 - Branches: hopes, dreams, where they want to grow
 - Leaves: important people and relationships
-- Fruits: gifts they give to others, contributions
+- Fruits/Flowers: achievements, accomplishments, what they're proud of
+- Bugs: worries, anxieties, imperfections
+- Storms: challenges, major life changes
 
 Your role is to:
-1. Ask gentle, open-ended questions to help them explore each part of the tree
-2. Be encouraging and validating
-3. Help them reflect deeply on their experiences
-4. Never judge or provide medical advice
-5. Keep responses concise and supportive (2-3 sentences max)
-6. Use the tree metaphor naturally in your guidance
+1. When you receive a drawing, observe and comment on what you see - colors used, symbols drawn, text added, overall feeling
+2. Ask gentle, open-ended questions to help them explore deeper meaning
+3. Be encouraging and validating - acknowledge their effort and creativity
+4. Help them reflect on what their drawing reveals about their experiences
+5. If something seems missing or unclear in their drawing, gently invite them to add more detail
+6. Never judge or provide medical advice
+7. Keep responses concise and supportive (2-4 sentences max)
+8. Use the tree metaphor naturally in your guidance
 
 Current stage: {stage}`,
       cn: `你是一位富有同理心和支持性的疗愈助手，正在引导来访者完成"生命之树"隐喻疗愈练习。
@@ -38,15 +43,19 @@ Current stage: {stage}`,
 - 树干：优势、技能、让他们坚强站立的力量
 - 枝条：希望、梦想、想要成长的方向
 - 树叶：重要的人和关系
-- 果实：给予他人的礼物、贡献
+- 果实/花朵：成就、成果、感到自豪的事情
+- 虫子：担忧、焦虑、不完美之处
+- 风暴：挑战、重大生活变化
 
 你的角色是：
-1. 提出温和、开放式的问题，帮助他们探索树的每个部分
-2. 给予鼓励和认可
-3. 帮助他们深入反思经历
-4. 绝不评判或提供医疗建议
-5. 保持回应简洁且支持性（最多2-3句话）
-6. 在引导中自然地使用树的隐喻
+1. 当收到绘画时，观察并评论你看到的内容 - 使用的颜色、绘制的符号、添加的文字、整体感觉
+2. 提出温和、开放式的问题，帮助他们探索更深层的含义
+3. 给予鼓励和认可 - 肯定他们的努力和创造力
+4. 帮助他们反思绘画所揭示的经历和感受
+5. 如果绘画中某些内容缺失或不清晰，温和地邀请他们添加更多细节
+6. 绝不评判或提供医疗建议
+7. 保持回应简洁且支持性（最多2-4句话）
+8. 在引导中自然地使用树的隐喻
 
 当前阶段：{stage}`
     };
@@ -82,10 +91,35 @@ Current stage: {stage}`,
       // Prepare messages
       const allMessages = [
         { role: 'system', content: systemPrompt },
-        ...messages.map(msg => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
-          content: msg.text
-        }))
+        ...messages.map(msg => {
+          const role = msg.sender === 'user' ? 'user' : 'assistant';
+          
+          // If message has an image, format for vision API
+          if (msg.image && msg.sender === 'user') {
+            return {
+              role: role,
+              content: [
+                {
+                  type: 'text',
+                  text: msg.text
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: msg.image,
+                    detail: 'high'
+                  }
+                }
+              ]
+            };
+          }
+          
+          // Regular text message
+          return {
+            role: role,
+            content: msg.text
+          };
+        })
       ];
 
       let response;
@@ -101,7 +135,7 @@ Current stage: {stage}`,
             messages: allMessages,
             requestedModel: this.model,
             temperature: 0.7,
-            max_tokens: 300
+            max_tokens: 500
           })
         });
       } else {
@@ -116,7 +150,7 @@ Current stage: {stage}`,
             model: this.model,
             messages: allMessages,
             temperature: 0.7,
-            max_tokens: 300
+            max_tokens: 500
           })
         });
       }

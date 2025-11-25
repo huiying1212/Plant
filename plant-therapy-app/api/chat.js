@@ -20,7 +20,7 @@ export default async function handler(req, res) {
 
   // Get API key from server environment (not REACT_APP_ prefix)
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL || 'gpt-4-turbo';
+  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
   
   if (!apiKey) {
     console.error('OPENAI_API_KEY not configured in Vercel environment variables');
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, requestedModel, temperature = 0.7, max_tokens = 300 } = req.body;
+    const { messages, requestedModel, temperature = 0.7, max_tokens = 500 } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Invalid request: messages array required' });

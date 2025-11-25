@@ -15,7 +15,8 @@ function Canvas({ language, onClose }) {
   const [recentColors, setRecentColors] = useState(['#EA5851']);
   const [showColorWheel, setShowColorWheel] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
+  const [isMicrophoneOn, setIsMicrophoneOn] = useState(false);
   const [chatPanelOpen, setChatPanelOpen] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
   const [textInputValue, setTextInputValue] = useState('');
@@ -27,6 +28,7 @@ function Canvas({ language, onClose }) {
   const [historyStep, setHistoryStep] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [rating, setRating] = useState(null);
+  const [hasSubmittedCurrentStep, setHasSubmittedCurrentStep] = useState(false);
   
   // Chat-related state
   const [chatMessages, setChatMessages] = useState([]);
@@ -1069,9 +1071,9 @@ function Canvas({ language, onClose }) {
     }
   };
 
-  const nextStep = () => {
-    if (currentStep < steps.length - 1) {
-      // Add step transition and guidance messages to chat history
+  const nextStep = async () => {
+    // Skip introduction step (step 0) - no submission needed
+    if (currentStep === 0) {
       const nextStepIndex = currentStep + 1;
       const nextStepData = steps[nextStepIndex];
       
@@ -1083,7 +1085,6 @@ function Canvas({ language, onClose }) {
         timestamp: new Date().toISOString()
       };
       
-      // Add the step instruction as a bot message
       const instructionMessage = {
         sender: 'bot',
         text: language === 'EN'
@@ -1094,7 +1095,6 @@ function Canvas({ language, onClose }) {
       
       const messages = [stepTransitionMessage, instructionMessage];
       
-      // Add example image as a message if available
       if (nextStepData.exampleImage) {
         const exampleMessage = {
           sender: 'bot',
@@ -1107,8 +1107,108 @@ function Canvas({ language, onClose }) {
       
       setChatMessages(prevMessages => [...prevMessages, ...messages]);
       setCurrentStep(currentStep + 1);
+      setHasSubmittedCurrentStep(false);
+      return;
+    }
+    
+    // For drawing steps (1-7), require submission before proceeding
+    if (!hasSubmittedCurrentStep && currentStep > 0) {
+      // First click: Save and submit drawing to GPT
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const canvasDataUrl = canvas.toDataURL('image/png');
+        
+        // Create a message with the canvas image
+        const currentStepData = steps[currentStep];
+        const userSubmissionMessage = {
+          sender: 'user',
+          text: language === 'EN' 
+            ? `Here is my drawing for ${currentStepData.titleEN}`
+            : `这是我的${currentStepData.titleCN}绘画`,
+          timestamp: new Date().toISOString(),
+          image: canvasDataUrl
+        };
+        
+        // Add user's submission to chat
+        const updatedMessages = [...chatMessages, userSubmissionMessage];
+        setChatMessages(updatedMessages);
+        setIsLLMTyping(true);
+        
+        try {
+          // Get LLM response about the drawing
+          const llmResponse = await llmService.sendMessage(
+            updatedMessages,
+            language,
+            currentStep
+          );
+          
+          const botMessage = {
+            sender: 'bot',
+            text: llmResponse,
+            timestamp: new Date().toISOString()
+          };
+          
+          setChatMessages([...updatedMessages, botMessage]);
+        } catch (error) {
+          console.error('Error communicating with LLM:', error);
+          
+          let errorText = language === 'EN' 
+            ? "I'm having trouble connecting right now. You can still continue to the next step."
+            : "我现在遇到连接问题。你可以继续下一步。";
+          
+          const errorMessage = {
+            sender: 'bot',
+            text: errorText,
+            timestamp: new Date().toISOString()
+          };
+          setChatMessages([...updatedMessages, errorMessage]);
+        } finally {
+          setIsLLMTyping(false);
+        }
+        
+        // Mark current step as submitted
+        setHasSubmittedCurrentStep(true);
+      }
     } else {
-      setIsCompleted(true);
+      // Second click: Proceed to next step
+      if (currentStep < steps.length - 1) {
+        const nextStepIndex = currentStep + 1;
+        const nextStepData = steps[nextStepIndex];
+        
+        const stepTransitionMessage = {
+          sender: 'system',
+          text: language === 'EN' 
+            ? `━━━ ${nextStepData.titleEN} ━━━`
+            : `━━━ ${nextStepData.titleCN} ━━━`,
+          timestamp: new Date().toISOString()
+        };
+        
+        const instructionMessage = {
+          sender: 'bot',
+          text: language === 'EN'
+            ? `${nextStepData.instructionEN}\n\n${nextStepData.descriptionEN}`
+            : `${nextStepData.instructionCN}\n\n${nextStepData.descriptionCN}`,
+          timestamp: new Date().toISOString()
+        };
+        
+        const messages = [stepTransitionMessage, instructionMessage];
+        
+        if (nextStepData.exampleImage) {
+          const exampleMessage = {
+            sender: 'bot',
+            text: language === 'EN' ? 'Example:' : '示例：',
+            timestamp: new Date().toISOString(),
+            image: nextStepData.exampleImage
+          };
+          messages.push(exampleMessage);
+        }
+        
+        setChatMessages(prevMessages => [...prevMessages, ...messages]);
+        setCurrentStep(currentStep + 1);
+        setHasSubmittedCurrentStep(false);
+      } else {
+        setIsCompleted(true);
+      }
     }
   };
 
@@ -1343,31 +1443,81 @@ function Canvas({ language, onClose }) {
 
         {/* Right Bottom Buttons - Above Bottom Toolbar */}
         <div className="right-bottom-buttons">
+          {/* Re-edit Button - shown when drawing is submitted */}
+          {hasSubmittedCurrentStep && currentStep > 0 && (
+            <button 
+              type="button"
+              className="next-step-btn-floating reedit-btn"
+              onClick={() => {
+                setHasSubmittedCurrentStep(false);
+                // Add a message to chat informing the user they can now re-edit
+                const reeditMessage = {
+                  sender: 'bot',
+                  text: language === 'EN' 
+                    ? 'Feel free to continue editing your drawing. Click "Submit Drawing" again when you\'re ready.'
+                    : '请继续编辑你的绘画。完成后再次点击"提交绘画"。',
+                  timestamp: new Date().toISOString()
+                };
+                setChatMessages(prevMessages => [...prevMessages, reeditMessage]);
+              }}
+            >
+              {language === 'EN' ? 'Re-edit' : '重新编辑'}
+            </button>
+          )}
+          
           {/* Next Step Button */}
           {currentStep < steps.length - 1 && (
             <button 
               type="button"
-              className="next-step-btn-floating"
+              className={`next-step-btn-floating ${isLLMTyping ? 'loading' : ''}`}
               onClick={nextStep}
+              disabled={isLLMTyping}
             >
-              {language === 'EN' ? 'Next Step' : '下一步'}
+              {isLLMTyping && !hasSubmittedCurrentStep ? (
+                <>
+                  <span className="spinner"></span>
+                  {language === 'EN' ? 'Processing...' : '处理中...'}
+                </>
+              ) : currentStep === 0 ? (
+                language === 'EN' ? 'Next Step' : '下一步'
+              ) : !hasSubmittedCurrentStep ? (
+                language === 'EN' ? 'Submit Drawing' : '提交绘画'
+              ) : (
+                language === 'EN' ? 'Next Step' : '下一步'
+              )}
             </button>
           )}
           {currentStep === steps.length - 1 && (
             <button 
               type="button"
-              className="next-step-btn-floating complete-btn"
+              className={`next-step-btn-floating complete-btn ${isLLMTyping ? 'loading' : ''}`}
               onClick={nextStep}
+              disabled={isLLMTyping}
             >
-              {language === 'EN' ? 'Complete' : '完成'}
+              {isLLMTyping && !hasSubmittedCurrentStep ? (
+                <>
+                  <span className="spinner"></span>
+                  {language === 'EN' ? 'Processing...' : '处理中...'}
+                </>
+              ) : !hasSubmittedCurrentStep ? (
+                language === 'EN' ? 'Submit Drawing' : '提交绘画'
+              ) : (
+                language === 'EN' ? 'Complete' : '完成'
+              )}
             </button>
           )}
           
-          <button className="bottom-tool-btn microphone-btn">
+          <button 
+            className={`bottom-tool-btn microphone-btn ${isMicrophoneOn ? 'active' : ''}`}
+            onClick={() => setIsMicrophoneOn(!isMicrophoneOn)}
+          >
             <img src="/element/microphone.svg" alt="Microphone" />
           </button>
-          <button className="bottom-tool-btn" onClick={() => setIsMuted(!isMuted)}>
-            <img src={isMuted ? "/element/mute.svg" : "/element/unmute.svg"} alt="Mute" />
+          <button 
+            className={`bottom-tool-btn speaker-btn ${isSpeakerOn ? 'active' : ''}`}
+            onClick={() => setIsSpeakerOn(!isSpeakerOn)}
+          >
+            <img src="/element/unmute.svg" alt="Speaker" />
           </button>
         </div>
       </div>
