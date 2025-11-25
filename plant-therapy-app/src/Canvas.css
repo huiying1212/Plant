@@ -473,6 +473,39 @@
   background-color: #6fa054;
 }
 
+/* Recording state for microphone button */
+.bottom-tool-btn.microphone-btn.recording {
+  background-color: #EA5851;
+  position: relative;
+}
+
+.bottom-tool-btn.microphone-btn.recording:hover {
+  background-color: #d84841;
+}
+
+/* Recording indicator */
+.recording-indicator {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  background-color: #FFFFFF;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
 /* Canvas Wrapper */
 .canvas-wrapper {
   position: absolute;

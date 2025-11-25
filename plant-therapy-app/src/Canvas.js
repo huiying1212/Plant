@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import './Canvas.css';
 import llmService from './llmService';
 import ttsService from './ttsService';
+import sttService from './sttService';
 
 function Canvas({ language, onClose }) {
   const canvasRef = useRef(null);
@@ -18,6 +19,7 @@ function Canvas({ language, onClose }) {
   const [showTextInput, setShowTextInput] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [isMicrophoneOn, setIsMicrophoneOn] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [chatPanelOpen, setChatPanelOpen] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
   const [textInputValue, setTextInputValue] = useState('');
@@ -576,6 +578,138 @@ function Canvas({ language, onClose }) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendChatMessage();
+    }
+  };
+
+  // Handle microphone button click for voice input
+  const handleMicrophoneClick = async () => {
+    if (isRecording) {
+      // Stop recording and transcribe
+      console.log('[Canvas] Stopping recording...');
+      setIsRecording(false);
+      setIsMicrophoneOn(false);
+      
+      try {
+        // Stop recording and get audio blob
+        const audioBlob = await sttService.stopRecording();
+        console.log('[Canvas] Recording stopped, transcribing...');
+        
+        // Show a temporary "transcribing" message
+        const transcribingMessage = {
+          sender: 'system',
+          text: language === 'EN' ? 'Transcribing audio...' : '正在转录音频...',
+          timestamp: new Date().toISOString()
+        };
+        setChatMessages(prev => [...prev, transcribingMessage]);
+        
+        // Transcribe audio to text
+        const transcribedText = await sttService.transcribe(audioBlob, language);
+        console.log('[Canvas] Transcription result:', transcribedText);
+        
+        // Remove transcribing message
+        setChatMessages(prev => prev.filter(msg => msg !== transcribingMessage));
+        
+        // Add user's voice message to chat
+        const userMessage = {
+          sender: 'user',
+          text: transcribedText,
+          timestamp: new Date().toISOString(),
+          isVoiceMessage: true
+        };
+        
+        const updatedMessages = [...chatMessages, userMessage];
+        setChatMessages(updatedMessages);
+        setIsLLMTyping(true);
+        
+        // Get LLM response
+        const llmResponse = await llmService.sendMessage(
+          updatedMessages,
+          language,
+          currentStep
+        );
+        
+        // Add LLM response to chat
+        const botMessage = {
+          sender: 'bot',
+          text: llmResponse,
+          timestamp: new Date().toISOString()
+        };
+        
+        setChatMessages([...updatedMessages, botMessage]);
+        setIsLLMTyping(false);
+        
+        // If speaker is on, play the response as speech
+        if (isSpeakerOn) {
+          ttsService.stop();
+          ttsService.playText(llmResponse, language).catch(ttsError => {
+            console.error('[Canvas] TTS Error:', ttsError);
+          });
+        }
+      } catch (error) {
+        console.error('[Canvas] Voice input error:', error);
+        setIsRecording(false);
+        setIsMicrophoneOn(false);
+        
+        // Show error message
+        let errorText;
+        if (error.message.includes('API key')) {
+          errorText = language === 'EN' 
+            ? "API key not configured. Please check your .env.local file."
+            : "API密钥未配置。请检查您的.env.local文件。";
+        } else if (error.message.includes('No active recording')) {
+          errorText = language === 'EN' 
+            ? "Recording not started properly. Please try again."
+            : "录音未正确启动。请重试。";
+        } else if (error.name === 'NotAllowedError') {
+          errorText = language === 'EN' 
+            ? "Microphone access denied. Please allow microphone access in your browser settings."
+            : "麦克风访问被拒绝。请在浏览器设置中允许麦克风访问。";
+        } else {
+          errorText = language === 'EN' 
+            ? "Voice input failed. Please try again."
+            : "语音输入失败。请重试。";
+        }
+        
+        const errorMessage = {
+          sender: 'bot',
+          text: errorText,
+          timestamp: new Date().toISOString()
+        };
+        setChatMessages(prev => [...prev, errorMessage]);
+      }
+    } else {
+      // Start recording
+      console.log('[Canvas] Starting recording...');
+      try {
+        await sttService.startRecording();
+        setIsRecording(true);
+        setIsMicrophoneOn(true);
+        console.log('[Canvas] Recording started');
+      } catch (error) {
+        console.error('[Canvas] Error starting recording:', error);
+        
+        let errorText;
+        if (error.name === 'NotAllowedError') {
+          errorText = language === 'EN' 
+            ? "Microphone access denied. Please allow microphone access in your browser settings."
+            : "麦克风访问被拒绝。请在浏览器设置中允许麦克风访问。";
+        } else if (error.name === 'NotFoundError') {
+          errorText = language === 'EN' 
+            ? "No microphone found. Please connect a microphone and try again."
+            : "未找到麦克风。请连接麦克风后重试。";
+        } else {
+          errorText = language === 'EN' 
+            ? "Failed to start recording. Please try again."
+            : "启动录音失败。请重试。";
+        }
+        
+        const errorMessage = {
+          sender: 'bot',
+          text: errorText,
+          timestamp: new Date().toISOString()
+        };
+        setChatMessages(prev => [...prev, errorMessage]);
+      }
     }
   };
 
@@ -1498,10 +1632,16 @@ function Canvas({ language, onClose }) {
           )}
           
           <button 
-            className={`bottom-tool-btn microphone-btn ${isMicrophoneOn ? 'active' : ''}`}
-            onClick={() => setIsMicrophoneOn(!isMicrophoneOn)}
+            className={`bottom-tool-btn microphone-btn ${isRecording ? 'active recording' : ''}`}
+            onClick={handleMicrophoneClick}
+            title={language === 'EN' 
+              ? (isRecording ? 'Stop recording' : 'Start voice input') 
+              : (isRecording ? '停止录音' : '开始语音输入')}
           >
             <img src="/element/microphone.svg" alt="Microphone" />
+            {isRecording && (
+              <span className="recording-indicator">●</span>
+            )}
           </button>
           <button 
             className={`bottom-tool-btn speaker-btn ${isSpeakerOn ? 'active' : ''}`}
