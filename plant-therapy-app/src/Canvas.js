@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import './Canvas.css';
 import llmService from './llmService';
+import ttsService from './ttsService';
 
 function Canvas({ language, onClose }) {
   const canvasRef = useRef(null);
@@ -416,12 +417,13 @@ function Canvas({ language, onClose }) {
     // Add initial guidance when starting or language changes
     if (currentStep === 0) {
       const initialStepData = steps[0];
+      const initialText = language === 'EN'
+        ? `${initialStepData.instructionEN}\n\n${initialStepData.descriptionEN}`
+        : `${initialStepData.instructionCN}\n\n${initialStepData.descriptionCN}`;
       const initialMessages = [
         {
           sender: 'bot',
-          text: language === 'EN'
-            ? `${initialStepData.instructionEN}\n\n${initialStepData.descriptionEN}`
-            : `${initialStepData.instructionCN}\n\n${initialStepData.descriptionCN}`,
+          text: initialText,
           timestamp: new Date().toISOString()
         }
       ];
@@ -436,6 +438,13 @@ function Canvas({ language, onClose }) {
       chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages]);
+
+  // Handle speaker on/off - stop audio when turned off
+  useEffect(() => {
+    if (!isSpeakerOn) {
+      ttsService.stop();
+    }
+  }, [isSpeakerOn]);
 
   // Function to redraw canvas with base content and texts
   const redrawCanvasWithTexts = () => {
@@ -519,6 +528,16 @@ function Canvas({ language, onClose }) {
       };
       
       setChatMessages([...updatedMessages, botMessage]);
+      setIsLLMTyping(false); // Stop typing indicator immediately after message is added
+      
+      // If speaker is on, play the response as speech (don't block on this)
+      if (isSpeakerOn) {
+        // Stop any currently playing audio before playing new response
+        ttsService.stop();
+        ttsService.playText(llmResponse, language).catch(ttsError => {
+          console.error('[Canvas] TTS Error:', ttsError);
+        });
+      }
     } catch (error) {
       console.error('Error communicating with LLM:', error);
       
@@ -548,7 +567,6 @@ function Canvas({ language, onClose }) {
         timestamp: new Date().toISOString()
       };
       setChatMessages([...updatedMessages, errorMessage]);
-    } finally {
       setIsLLMTyping(false);
     }
   };
@@ -1021,6 +1039,18 @@ function Canvas({ language, onClose }) {
       setChatMessages(prevMessages => [...prevMessages, ...messages]);
       setCurrentStep(currentStep + 1);
       setHasSubmittedCurrentStep(false);
+      
+      // If speaker is on, play the instruction as speech (don't block on this)
+      if (isSpeakerOn) {
+        // Stop any currently playing audio before playing new instruction
+        ttsService.stop();
+        const instructionText = language === 'EN'
+          ? `${nextStepData.instructionEN}\n\n${nextStepData.descriptionEN}`
+          : `${nextStepData.instructionCN}\n\n${nextStepData.descriptionCN}`;
+        ttsService.playText(instructionText, language).catch(ttsError => {
+          console.error('[Canvas] TTS Error:', ttsError);
+        });
+      }
       return;
     }
     
@@ -1062,6 +1092,16 @@ function Canvas({ language, onClose }) {
           };
           
           setChatMessages([...updatedMessages, botMessage]);
+          setIsLLMTyping(false); // Stop typing indicator immediately after message is added
+          
+          // If speaker is on, play the response as speech (don't block on this)
+          if (isSpeakerOn) {
+            // Stop any currently playing audio before playing new response
+            ttsService.stop();
+            ttsService.playText(llmResponse, language).catch(ttsError => {
+              console.error('[Canvas] TTS Error:', ttsError);
+            });
+          }
         } catch (error) {
           console.error('Error communicating with LLM:', error);
           
@@ -1075,7 +1115,6 @@ function Canvas({ language, onClose }) {
             timestamp: new Date().toISOString()
           };
           setChatMessages([...updatedMessages, errorMessage]);
-        } finally {
           setIsLLMTyping(false);
         }
         
@@ -1119,6 +1158,18 @@ function Canvas({ language, onClose }) {
         setChatMessages(prevMessages => [...prevMessages, ...messages]);
         setCurrentStep(currentStep + 1);
         setHasSubmittedCurrentStep(false);
+        
+        // If speaker is on, play the instruction as speech (don't block on this)
+        if (isSpeakerOn) {
+          // Stop any currently playing audio before playing new instruction
+          ttsService.stop();
+          const instructionText = language === 'EN'
+            ? `${nextStepData.instructionEN}\n\n${nextStepData.descriptionEN}`
+            : `${nextStepData.instructionCN}\n\n${nextStepData.descriptionCN}`;
+          ttsService.playText(instructionText, language).catch(ttsError => {
+            console.error('[Canvas] TTS Error:', ttsError);
+          });
+        }
       } else {
         setIsCompleted(true);
       }
@@ -1454,7 +1505,11 @@ function Canvas({ language, onClose }) {
           </button>
           <button 
             className={`bottom-tool-btn speaker-btn ${isSpeakerOn ? 'active' : ''}`}
-            onClick={() => setIsSpeakerOn(!isSpeakerOn)}
+            onClick={() => {
+              const newState = !isSpeakerOn;
+              console.log('[Canvas] Speaker button clicked. New state:', newState);
+              setIsSpeakerOn(newState);
+            }}
           >
             <img src="/element/unmute.svg" alt="Speaker" />
           </button>
@@ -1554,7 +1609,7 @@ function Canvas({ language, onClose }) {
           <div className="chat-messages">
             {chatMessages.map((message, idx) => (
               <div
-                key={message.timestamp || idx}
+                key={`${message.timestamp}-${idx}-${message.sender}`}
                 className={`chat-message ${message.sender}`}
               >
                 <div className="chat-bubble">
