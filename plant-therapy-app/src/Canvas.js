@@ -24,6 +24,7 @@ function Canvas({ language, onClose }) {
   const [draggingTextIndex, setDraggingTextIndex] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [hoveringTextIndex, setHoveringTextIndex] = useState(null);
+  const [tempTextIndex, setTempTextIndex] = useState(null); // Track temporary text that can be moved
   const [history, setHistory] = useState([]);
   const [historyStep, setHistoryStep] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -775,12 +776,14 @@ function Canvas({ language, onClose }) {
     }
     
     if (clickedTextIndex !== -1) {
-      // Start dragging text
-      setDraggingTextIndex(clickedTextIndex);
-      setDragOffset({
-        x: x - canvasTexts[clickedTextIndex].x,
-        y: y - canvasTexts[clickedTextIndex].y
-      });
+      // Only allow dragging temporary text
+      if (canvasTexts[clickedTextIndex].isTemporary) {
+        setDraggingTextIndex(clickedTextIndex);
+        setDragOffset({
+          x: x - canvasTexts[clickedTextIndex].x,
+          y: y - canvasTexts[clickedTextIndex].y
+        });
+      }
       return;
     }
     
@@ -800,124 +803,10 @@ function Canvas({ language, onClose }) {
       ctx.lineWidth = brushSize;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
+      ctx.globalCompositeOperation = 'source-over';
     } else if (currentTool === 'eraser') {
-      // Eraser should not erase SVGs, so we need to redraw everything first
-      // Save current position
-      const currentX = x;
-      const currentY = y;
-      
-      // Stop drawing temporarily
-      setIsDrawing(false);
-      
-      // Redraw base canvas and SVGs
-      const redrawCanvas = () => {
-        // Reset globalAlpha to ensure SVGs are drawn with full opacity
-        ctx.globalAlpha = 1;
-        
-        // Clear canvas
-        ctx.fillStyle = '#F5F5F5';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const offsetX = -150;
-        const startX = centerX + offsetX;
-        const startY = centerY;
-        
-        const baseWidth = 655;
-        const baseHeight = 493;
-        const scale = 1.2;
-        const svgWidth = baseWidth * scale;
-        const svgHeight = baseHeight * scale;
-        
-        // Get current step's SVG index
-        const currentStepData = currentStep > 0 ? steps[currentStep] : null;
-        const currentSvgIndex = currentStepData && currentStepData.svgIndex !== null ? currentStepData.svgIndex : -1;
-        
-        // Draw all SVGs from Set 2 EXCEPT the current step's SVG (these go below current step's Set 1 SVG)
-        const svgImagesSet2 = svgImagesSet2Ref.current;
-        if (svgImagesSet2 && svgImagesSet2.length > 0) {
-          // Enable high quality image smoothing
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          
-          svgImagesSet2.forEach((svgImg, index) => {
-            // Skip current step's SVG from Set 2 (will draw it later on top)
-            if (index !== currentSvgIndex && svgImg && svgImg.complete) {
-              const x = startX - svgWidth / 2;
-              const y = startY - svgHeight / 2;
-              
-              // Check if we have a colored version of this SVG
-              const coloredSvg = coloredSvgsRef.current[index];
-              if (coloredSvg && coloredSvg.complete) {
-                // Use the colored version with high-res dimensions
-                const highResScale = 4;
-                const highResWidth = 655 * highResScale;
-                const highResHeight = 493 * highResScale;
-                ctx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
-              } else {
-                // Use the original SVG
-                ctx.drawImage(svgImg, x, y, svgWidth, svgHeight);
-              }
-            }
-          });
-        }
-        
-        // If we're not on step 0 (introduction), draw the current step's SVG from Set 1
-        if (currentStep > 0 && currentSvgIndex >= 0) {
-          const svgImg = svgImagesSet1Ref.current[currentSvgIndex];
-          
-          if (svgImg && svgImg.complete) {
-            const x = startX - svgWidth / 2;
-            const y = startY - svgHeight / 2;
-            
-            // Draw the specific SVG for this step from Set 1
-            ctx.drawImage(svgImg, x, y, svgWidth, svgHeight);
-          }
-        }
-        
-        // Finally, draw current step's SVG from Set 2 (on top of everything)
-        if (currentStep > 0 && currentSvgIndex >= 0 && svgImagesSet2 && svgImagesSet2[currentSvgIndex]) {
-          // Check if we have a colored version of this SVG
-          const coloredSvg = coloredSvgsRef.current[currentSvgIndex];
-          
-          // Enable high quality image smoothing
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          
-          if (coloredSvg && coloredSvg.complete) {
-            // Use the colored version with high-res dimensions
-            const x = startX - svgWidth / 2;
-            const y = startY - svgHeight / 2;
-            
-            const highResScale = 4;
-            const highResWidth = 655 * highResScale;
-            const highResHeight = 493 * highResScale;
-            
-            ctx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
-          } else {
-            // Use the original SVG
-            const svgImg = svgImagesSet2[currentSvgIndex];
-            
-            if (svgImg && svgImg.complete) {
-              const x = startX - svgWidth / 2;
-              const y = startY - svgHeight / 2;
-              ctx.drawImage(svgImg, x, y, svgWidth, svgHeight);
-            }
-          }
-        }
-      };
-      
-      // Redraw everything except user drawings
-      redrawCanvas();
-      
-      // Resume drawing with eraser
-      setIsDrawing(true);
-      ctx.beginPath();
-      ctx.moveTo(currentX, currentY);
-      
-      // Set eraser properties
-      ctx.strokeStyle = '#F5F5F5';
+      // Use destination-out to erase content
+      ctx.globalCompositeOperation = 'destination-out';
       ctx.globalAlpha = 1;
       ctx.lineWidth = brushSize;
       ctx.lineCap = 'round';
@@ -950,6 +839,9 @@ function Canvas({ language, onClose }) {
       
       for (let i = canvasTexts.length - 1; i >= 0; i--) {
         const textObj = canvasTexts[i];
+        // Only allow hovering on temporary text
+        if (!textObj.isTemporary) continue;
+        
         ctx.font = `${textObj.fontSize || 24}px Avenir, sans-serif`;
         const metrics = ctx.measureText(textObj.text);
         const textWidth = metrics.width;
@@ -983,17 +875,12 @@ function Canvas({ language, onClose }) {
     if (isDrawing) {
       setIsDrawing(false);
       
-      // Reset globalAlpha to prevent affecting subsequent drawing operations
+      // Reset drawing context to default state
       const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
         ctx.globalAlpha = 1;
-      }
-      
-      // If we were using the eraser, make sure SVGs are redrawn
-      if (currentTool === 'eraser') {
-        // We don't need to do anything special here since SVGs are protected
-        // by the redrawCanvas function in startDrawing
+        ctx.globalCompositeOperation = 'source-over'; // Reset to normal drawing mode
       }
       
       saveToHistory();
@@ -1061,13 +948,39 @@ function Canvas({ language, onClose }) {
         x: canvas.width / 2 - 100,
         y: canvas.height / 2 + canvasTexts.length * 40,
         color: currentColor,
-        fontSize: 24
+        fontSize: 24,
+        isTemporary: true // Mark as temporary until user confirms
       };
       
-      setCanvasTexts([...canvasTexts, newText]);
+      const newTexts = [...canvasTexts, newText];
+      setCanvasTexts(newTexts);
+      setTempTextIndex(newTexts.length - 1); // Set as the current temporary text
       
       setTextInputValue('');
       setShowTextInput(false);
+    }
+  };
+
+  const confirmTextPlacement = () => {
+    if (tempTextIndex !== null) {
+      const newTexts = [...canvasTexts];
+      newTexts[tempTextIndex] = {
+        ...newTexts[tempTextIndex],
+        isTemporary: false
+      };
+      setCanvasTexts(newTexts);
+      setTempTextIndex(null);
+      setCurrentTool('pen'); // Reset tool to pen after confirming text
+      saveToHistory();
+    }
+  };
+
+  const cancelTextPlacement = () => {
+    if (tempTextIndex !== null) {
+      const newTexts = canvasTexts.filter((_, index) => index !== tempTextIndex);
+      setCanvasTexts(newTexts);
+      setTempTextIndex(null);
+      setCurrentTool('pen'); // Reset tool to pen after canceling text
     }
   };
 
@@ -1399,6 +1312,32 @@ function Canvas({ language, onClose }) {
                      'crosshair' 
             }}
           />
+          
+          {/* Text Confirmation Buttons - shown next to temporary text */}
+          {tempTextIndex !== null && canvasTexts[tempTextIndex] && (
+            <div 
+              className="text-action-buttons"
+              style={{
+                left: `${canvasTexts[tempTextIndex].x}px`,
+                top: `${canvasTexts[tempTextIndex].y - 45}px`
+              }}
+            >
+              <button 
+                className="text-action-btn cancel-btn"
+                onClick={cancelTextPlacement}
+                title={language === 'EN' ? 'Cancel' : '取消'}
+              >
+                <img src="/element/wrong.svg" alt="Cancel" />
+              </button>
+              <button 
+                className="text-action-btn confirm-btn"
+                onClick={confirmTextPlacement}
+                title={language === 'EN' ? 'Confirm' : '确定'}
+              >
+                <img src="/element/correct.svg" alt="Confirm" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Bottom Toolbar */}
@@ -1579,7 +1518,7 @@ function Canvas({ language, onClose }) {
               className="text-input-field"
             />
             <button 
-              className={`add-text-btn ${textInputValue ? 'active' : ''}`}
+              className="add-text-btn active"
               onClick={addTextToCanvas}
             >
               {language === 'EN' ? 'Add Text' : '添加文字'}

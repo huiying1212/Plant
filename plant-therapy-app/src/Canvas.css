@@ -764,9 +764,9 @@
 /* Chat / Guidance Panel - floating window (no slide) */
 .chat-panel {
   position: absolute;
-  top: 20px;            /* higher position to make it longer */
+  top: 20px;
   right: 20px;
-  bottom: 100px;        /* above bottom toolbar */
+  bottom: 180px;        /* higher bottom to avoid covering buttons */
   width: 360px;
   background: rgba(255, 255, 255, 0.98);
   border: 1px solid #E2E2E2;
@@ -1125,6 +1125,66 @@
 .next-step-btn-floating.reedit-btn:hover {
   background: #F7FBF3;
   box-shadow: 0 6px 20px rgba(135, 178, 107, 0.3);
+}
+
+/* Text Action Buttons - Follow the temporary text */
+.text-action-buttons {
+  position: absolute;
+  display: flex;
+  gap: 8px;
+  z-index: 100;
+  pointer-events: auto;
+}
+
+.text-action-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.text-action-btn img {
+  width: 18px;
+  height: 18px;
+}
+
+.text-action-btn.cancel-btn {
+  background: #FFFFFF;
+  border: 2px solid #EA5851;
+}
+
+.text-action-btn.cancel-btn img {
+  filter: invert(45%) sepia(85%) saturate(2266%) hue-rotate(331deg) brightness(94%) contrast(88%);
+}
+
+.text-action-btn.cancel-btn:hover {
+  background: #EA5851;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(234, 88, 81, 0.3);
+}
+
+.text-action-btn.cancel-btn:hover img {
+  filter: brightness(0) invert(1);
+}
+
+.text-action-btn.confirm-btn {
+  background: #87B26B;
+}
+
+.text-action-btn.confirm-btn img {
+  filter: brightness(0) invert(1);
+}
+
+.text-action-btn.confirm-btn:hover {
+  background: #6fa054;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(135, 178, 107, 0.4);
 }
 
 .next-step-btn-floating.loading {
