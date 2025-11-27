@@ -28,6 +28,8 @@ function Canvas({ language, onClose }) {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [hoveringTextIndex, setHoveringTextIndex] = useState(null);
   const [tempTextIndex, setTempTextIndex] = useState(null); // Track temporary text that can be moved
+  const [brushStrokes, setBrushStrokes] = useState([]); // Store brush strokes separately
+  const [currentStroke, setCurrentStroke] = useState(null); // Track current stroke being drawn
   const [history, setHistory] = useState([]);
   const [historyStep, setHistoryStep] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -156,12 +158,24 @@ function Canvas({ language, onClose }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
-      // Initial setup
+      // Initial setup with high DPI support
       const ctx = canvas.getContext('2d');
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      
+      // Set canvas size accounting for device pixel ratio
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      
+      // Scale context to match device pixel ratio
+      ctx.scale(dpr, dpr);
+      
+      // Set canvas display size
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+      
       ctx.fillStyle = '#F5F5F5';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, rect.width, rect.height);
       
       // Define SVG filenames shared by both sets
       const svgFiles = [
@@ -174,9 +188,11 @@ function Canvas({ language, onClose }) {
         'Chatbot 08 (STORM)_画板 11.svg'
       ];
       
-      // Calculate position: center slightly to the left
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
+      // Calculate position: center slightly to the left (using display size, not canvas size)
+      const displayWidth = rect.width;
+      const displayHeight = rect.height;
+      const centerX = displayWidth / 2;
+      const centerY = displayHeight / 2;
       const offsetX = -150; // Offset to the left (negative = left)
       const startX = centerX + offsetX;
       const startY = centerY;
@@ -199,6 +215,10 @@ function Canvas({ language, onClose }) {
         if (allLoadedSet2 && loadedCountSet2 === svgFiles.length) {
           // Draw all set 2 SVGs at the same position to form a complete tree
           const scale = 1.2; // Scale factor to make SVGs larger (2x = double size)
+          
+          // Enable high quality image smoothing for crisp SVG rendering
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           
           svgImagesSet2.forEach((svgImg) => {
             if (svgImg && svgImg.complete) {
@@ -272,13 +292,22 @@ function Canvas({ language, onClose }) {
         const currentImage = canvas.toDataURL();
         const img = new Image();
         img.onload = () => {
-          const oldWidth = canvas.width;
-          const oldHeight = canvas.height;
-          canvas.width = window.innerWidth;
-          canvas.height = window.innerHeight;
+          const dpr = window.devicePixelRatio || 1;
+          const newRect = canvas.getBoundingClientRect();
+          const oldWidth = canvas.width / dpr;
+          const oldHeight = canvas.height / dpr;
+          
+          canvas.width = newRect.width * dpr;
+          canvas.height = newRect.height * dpr;
+          
           const newCtx = canvas.getContext('2d');
+          newCtx.scale(dpr, dpr);
+          
+          canvas.style.width = `${newRect.width}px`;
+          canvas.style.height = `${newRect.height}px`;
+          
           newCtx.fillStyle = '#F5F5F5';
-          newCtx.fillRect(0, 0, canvas.width, canvas.height);
+          newCtx.fillRect(0, 0, newRect.width, newRect.height);
           // Draw the old content
           newCtx.drawImage(img, 0, 0, oldWidth, oldHeight, 0, 0, oldWidth, oldHeight);
           // Save to history after resize
@@ -307,16 +336,28 @@ function Canvas({ language, onClose }) {
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
     
     // Reset globalAlpha to ensure SVGs are drawn with full opacity
     ctx.globalAlpha = 1;
     
-    // First, redraw the base canvas with the background
-    ctx.fillStyle = '#F5F5F5';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Get display dimensions
+    const displayWidth = canvas.width / dpr;
+    const displayHeight = canvas.height / dpr;
     
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
+    // Create a temporary high-resolution canvas for drawing SVGs
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;  // Use full physical pixel width
+    tempCanvas.height = canvas.height; // Use full physical pixel height
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.scale(dpr, dpr); // Scale the context to work in display coordinates
+    
+    // Draw the background on temp canvas
+    tempCtx.fillStyle = '#F5F5F5';
+    tempCtx.fillRect(0, 0, displayWidth, displayHeight);
+    
+    const centerX = displayWidth / 2;
+    const centerY = displayHeight / 2;
     const offsetX = -150;
     const startX = centerX + offsetX;
     const startY = centerY;
@@ -331,16 +372,18 @@ function Canvas({ language, onClose }) {
     const currentStepData = currentStep > 0 ? steps[currentStep] : null;
     const currentSvgIndex = currentStepData && currentStepData.svgIndex !== null ? currentStepData.svgIndex : -1;
     
-    // Draw all SVGs from Set 2 EXCEPT the current step's SVG (these go below current step's Set 1 SVG)
+    // Draw all SVGs from Set 2 EXCEPT the current step's SVG and bugs SVG (these go below current step's Set 1 SVG)
     const svgImagesSet2 = svgImagesSet2Ref.current;
+    const bugsIndex = 5; // Bugs step SVG index
     if (svgImagesSet2 && svgImagesSet2.length > 0) {
       // Enable high quality image smoothing
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
+      tempCtx.imageSmoothingEnabled = true;
+      tempCtx.imageSmoothingQuality = 'high';
       
       svgImagesSet2.forEach((svgImg, index) => {
         // Skip current step's SVG from Set 2 (will draw it later on top)
-        if (index !== currentSvgIndex && svgImg && svgImg.complete) {
+        // Also skip bugs SVG (will draw it at the very end, just before brush strokes)
+        if (index !== currentSvgIndex && index !== bugsIndex && svgImg && svgImg.complete) {
           const x = startX - svgWidth / 2;
           const y = startY - svgHeight / 2;
           
@@ -351,10 +394,10 @@ function Canvas({ language, onClose }) {
             const highResScale = 4;
             const highResWidth = 655 * highResScale;
             const highResHeight = 493 * highResScale;
-            ctx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
+            tempCtx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
           } else {
             // Use the original SVG
-            ctx.drawImage(svgImg, x, y, svgWidth, svgHeight);
+            tempCtx.drawImage(svgImg, x, y, svgWidth, svgHeight);
           }
         }
       });
@@ -369,7 +412,7 @@ function Canvas({ language, onClose }) {
         const y = startY - svgHeight / 2;
         
         // Draw the specific SVG for this step from Set 1
-        ctx.drawImage(svgImg, x, y, svgWidth, svgHeight);
+        tempCtx.drawImage(svgImg, x, y, svgWidth, svgHeight);
       }
     }
     
@@ -379,8 +422,8 @@ function Canvas({ language, onClose }) {
       const coloredSvg = coloredSvgsRef.current[currentSvgIndex];
       
       // Enable high quality image smoothing
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
+      tempCtx.imageSmoothingEnabled = true;
+      tempCtx.imageSmoothingQuality = 'high';
       
       if (coloredSvg && coloredSvg.complete) {
         // Use the colored version
@@ -393,7 +436,7 @@ function Canvas({ language, onClose }) {
         const highResHeight = 493 * highResScale;
         
         // Draw from high-res source to display size
-        ctx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
+        tempCtx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
       } else {
         // Use the original SVG
         const svgImg = svgImagesSet2[currentSvgIndex];
@@ -401,12 +444,53 @@ function Canvas({ language, onClose }) {
         if (svgImg && svgImg.complete) {
           const x = startX - svgWidth / 2;
           const y = startY - svgHeight / 2;
-          ctx.drawImage(svgImg, x, y, svgWidth, svgHeight);
+          tempCtx.drawImage(svgImg, x, y, svgWidth, svgHeight);
         }
       }
     }
     
-    // Only save to history on step change, not on every render
+    // Draw bugs SVG on top of everything (but below brush strokes)
+    // This ensures bugs are always visible above all other tree parts
+    if (svgImagesSet2 && svgImagesSet2[bugsIndex]) {
+      const coloredBugsSvg = coloredSvgsRef.current[bugsIndex];
+      
+      // Enable high quality image smoothing
+      tempCtx.imageSmoothingEnabled = true;
+      tempCtx.imageSmoothingQuality = 'high';
+      
+      if (coloredBugsSvg && coloredBugsSvg.complete) {
+        // Use the colored version
+        const x = startX - svgWidth / 2;
+        const y = startY - svgHeight / 2;
+        
+        // Calculate the high-res dimensions
+        const highResScale = 4;
+        const highResWidth = 655 * highResScale;
+        const highResHeight = 493 * highResScale;
+        
+        // Draw from high-res source to display size
+        tempCtx.drawImage(coloredBugsSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
+      } else {
+        // Use the original SVG
+        const bugsSvg = svgImagesSet2[bugsIndex];
+        
+        if (bugsSvg && bugsSvg.complete) {
+          const x = startX - svgWidth / 2;
+          const y = startY - svgHeight / 2;
+          tempCtx.drawImage(bugsSvg, x, y, svgWidth, svgHeight);
+        }
+      }
+    }
+    
+    // Clear the main canvas and draw the new SVG layer
+    ctx.clearRect(0, 0, displayWidth, displayHeight);
+    // Draw the high-res temp canvas at display size (ctx is already scaled)
+    ctx.drawImage(tempCanvas, 0, 0, displayWidth, displayHeight);
+    
+    // Redraw all brush strokes from the array on top of the new SVGs
+    redrawBrushStrokes(ctx);
+    
+    // Save to history
     const newHistory = history.slice(0, historyStep + 1);
     newHistory.push(canvas.toDataURL());
     setHistory(newHistory);
@@ -448,20 +532,59 @@ function Canvas({ language, onClose }) {
     }
   }, [isSpeakerOn]);
 
-  // Function to redraw canvas with base content and texts
+  // Function to redraw brush strokes
+  const redrawBrushStrokes = (ctx) => {
+    brushStrokes.forEach((stroke) => {
+      if (stroke.points.length < 2) return;
+      
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      
+      if (stroke.tool === 'pen') {
+        ctx.strokeStyle = stroke.color;
+        ctx.globalAlpha = stroke.opacity / 100;
+        ctx.lineWidth = stroke.size;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (stroke.tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = stroke.size;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+      }
+      
+      for (let i = 1; i < stroke.points.length; i++) {
+        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    });
+  };
+
+  // Function to redraw canvas with base content, brush strokes, and texts
   const redrawCanvasWithTexts = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const displayWidth = canvas.width / dpr;
+    const displayHeight = canvas.height / dpr;
     
-    // First restore the base canvas from history (without texts)
+    // First restore the base canvas from history (SVGs and fills, but not brush strokes or texts)
     if (history.length > 0 && historyStep >= 0) {
       const img = new Image();
       img.src = history[historyStep];
       img.onload = () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
+        ctx.clearRect(0, 0, displayWidth, displayHeight);
+        // Draw the high-res history image at display size (ctx is already scaled)
+        ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+        
+        // Note: The history image already contains brush strokes, so we don't need to redraw them here
+        // The brush strokes were saved as part of the canvas when saveToHistory was called
         
         // Then draw all text elements on top
         canvasTexts.forEach((textObj) => {
@@ -734,13 +857,16 @@ function Canvas({ language, onClose }) {
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const displayWidth = canvas.width / dpr;
+    const displayHeight = canvas.height / dpr;
     
     // Reset globalAlpha to ensure SVGs are drawn with full opacity
     ctx.globalAlpha = 1;
     
     // Clear canvas and redraw base tree except for the current step's SVG
     ctx.fillStyle = '#F5F5F5';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, displayWidth, displayHeight);
     
     // Get the current step's SVG index
     const currentStepData = steps[currentStep];
@@ -748,11 +874,12 @@ function Canvas({ language, onClose }) {
     
     const currentSvgIndex = currentStepData.svgIndex;
     
-    // Draw all SVGs from Set 2 EXCEPT the current step's SVG (these go below current step's Set 1 SVG)
+    // Draw all SVGs from Set 2 EXCEPT the current step's SVG and bugs SVG (these go below current step's Set 1 SVG)
     const svgImagesSet2 = svgImagesSet2Ref.current;
+    const bugsIndex = 5; // Bugs step SVG index
     if (svgImagesSet2 && svgImagesSet2.length > 0) {
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
+      const centerX = displayWidth / 2;
+      const centerY = displayHeight / 2;
       const offsetX = -150;
       const startX = centerX + offsetX;
       const startY = centerY;
@@ -767,9 +894,9 @@ function Canvas({ language, onClose }) {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       
-      // Draw all SVGs from Set 2 except the current step's SVG
+      // Draw all SVGs from Set 2 except the current step's SVG and bugs SVG
       svgImagesSet2.forEach((svgImg, index) => {
-        if (index !== currentSvgIndex && svgImg && svgImg.complete) {
+        if (index !== currentSvgIndex && index !== bugsIndex && svgImg && svgImg.complete) {
           const x = startX - svgWidth / 2;
           const y = startY - svgHeight / 2;
           
@@ -792,8 +919,8 @@ function Canvas({ language, onClose }) {
     // Draw the current step's SVG from Set 1
     const svgImagesSet1 = svgImagesSet1Ref.current;
     if (svgImagesSet1 && svgImagesSet1.length > 0) {
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
+      const centerX = displayWidth / 2;
+      const centerY = displayHeight / 2;
       const offsetX = -150;
       const startX = centerX + offsetX;
       const startY = centerY;
@@ -871,8 +998,8 @@ function Canvas({ language, onClose }) {
       tempCtx.putImageData(imageData, 0, 0);
       
       // Draw the modified SVG on the main canvas (on top of everything)
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
+      const centerX = displayWidth / 2;
+      const centerY = displayHeight / 2;
       const offsetX = -150;
       const startX = centerX + offsetX;
       const startY = centerY;
@@ -898,6 +1025,52 @@ function Canvas({ language, onClose }) {
       // Use high quality PNG format
       coloredSvg.src = tempCanvas.toDataURL('image/png', 1.0);
       coloredSvgsRef.current[currentSvgIndex] = coloredSvg;
+      
+      // Draw bugs SVG on top of everything (but below brush strokes)
+      if (svgImagesSet2 && svgImagesSet2[bugsIndex]) {
+        const coloredBugsSvg = coloredSvgsRef.current[bugsIndex];
+        const centerX = displayWidth / 2;
+        const centerY = displayHeight / 2;
+        const offsetX = -150;
+        const startX = centerX + offsetX;
+        const startY = centerY;
+        
+        const baseWidth = 655;
+        const baseHeight = 493;
+        const scale = 1.2;
+        const svgWidth = baseWidth * scale;
+        const svgHeight = baseHeight * scale;
+        
+        // Enable high quality image smoothing
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        
+        if (coloredBugsSvg && coloredBugsSvg.complete) {
+          // Use the colored version
+          const x = startX - svgWidth / 2;
+          const y = startY - svgHeight / 2;
+          
+          // Calculate the high-res dimensions
+          const highResScale = 4;
+          const highResWidth = 655 * highResScale;
+          const highResHeight = 493 * highResScale;
+          
+          // Draw from high-res source to display size
+          ctx.drawImage(coloredBugsSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
+        } else {
+          // Use the original SVG
+          const bugsSvg = svgImagesSet2[bugsIndex];
+          
+          if (bugsSvg && bugsSvg.complete) {
+            const x = startX - svgWidth / 2;
+            const y = startY - svgHeight / 2;
+            ctx.drawImage(bugsSvg, x, y, svgWidth, svgHeight);
+          }
+        }
+      }
+      
+      // Redraw brush strokes on top of the filled SVG
+      redrawBrushStrokes(ctx);
       
       saveToHistory();
     }
@@ -948,6 +1121,16 @@ function Canvas({ language, onClose }) {
     setIsDrawing(true);
     ctx.beginPath();
     ctx.moveTo(x, y);
+    
+    // Start capturing the stroke
+    const newStroke = {
+      tool: currentTool,
+      color: currentColor,
+      size: brushSize,
+      opacity: brushOpacity,
+      points: [{ x, y }]
+    };
+    setCurrentStroke(newStroke);
     
     if (currentTool === 'pen') {
       ctx.strokeStyle = currentColor;
@@ -1015,6 +1198,14 @@ function Canvas({ language, onClose }) {
     const ctx = canvas.getContext('2d');
     ctx.lineTo(x, y);
     ctx.stroke();
+    
+    // Add point to current stroke
+    if (currentStroke) {
+      setCurrentStroke({
+        ...currentStroke,
+        points: [...currentStroke.points, { x, y }]
+      });
+    }
   };
 
   const stopDrawing = () => {
@@ -1026,6 +1217,12 @@ function Canvas({ language, onClose }) {
     
     if (isDrawing) {
       setIsDrawing(false);
+      
+      // Save the completed stroke
+      if (currentStroke && currentStroke.points.length > 0) {
+        setBrushStrokes([...brushStrokes, currentStroke]);
+        setCurrentStroke(null);
+      }
       
       // Reset drawing context to default state
       const canvas = canvasRef.current;
@@ -1099,7 +1296,7 @@ function Canvas({ language, onClose }) {
         text: textInputValue,
         x: canvas.width / 2 - 100,
         y: canvas.height / 2 + canvasTexts.length * 40,
-        color: currentColor,
+        color: '#000000', // Fixed black color for all text labels
         fontSize: 24,
         isTemporary: true // Mark as temporary until user confirms
       };
