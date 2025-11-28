@@ -147,6 +147,7 @@ function Canvas({ language, onClose }) {
   // Store loaded SVG images in refs so they persist across re-renders
   const svgImagesSet1Ref = useRef([]);
   const svgImagesSet2Ref = useRef([]);
+  const backSvgRef = useRef(null); // Store the back.svg image
   const svgsLoadedRef = useRef(false);
   
   // Store colored SVGs for each step (to preserve colors when switching steps)
@@ -197,6 +198,16 @@ function Canvas({ language, onClose }) {
       const startX = centerX + offsetX;
       const startY = centerY;
       
+      // Load back.svg (always at the bottom)
+      const backImg = new Image();
+      backImg.onload = () => {
+        backSvgRef.current = backImg;
+      };
+      backImg.onerror = (error) => {
+        console.error('Error loading back.svg:', error);
+      };
+      backImg.src = '/canvas/2/back.svg';
+      
       // Preload set 1 (public/canvas/1/English) for step-by-step reveal
       let loadedCountSet1 = 0;
       const svgImagesSet1 = [];
@@ -219,6 +230,17 @@ function Canvas({ language, onClose }) {
           // Enable high quality image smoothing for crisp SVG rendering
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
+          
+          // Draw back.svg first (at the very bottom)
+          if (backSvgRef.current && backSvgRef.current.complete) {
+            const baseWidth = 655;
+            const baseHeight = 493;
+            const svgWidth = baseWidth * scale;
+            const svgHeight = baseHeight * scale;
+            const x = startX - svgWidth / 2;
+            const y = startY - svgHeight / 2;
+            ctx.drawImage(backSvgRef.current, x, y, svgWidth, svgHeight);
+          }
           
           svgImagesSet2.forEach((svgImg) => {
             if (svgImg && svgImg.complete) {
@@ -367,6 +389,15 @@ function Canvas({ language, onClose }) {
     const scale = 1.2;
     const svgWidth = baseWidth * scale;
     const svgHeight = baseHeight * scale;
+    
+    // Draw back.svg first (at the very bottom, always visible)
+    if (backSvgRef.current && backSvgRef.current.complete) {
+      const x = startX - svgWidth / 2;
+      const y = startY - svgHeight / 2;
+      tempCtx.imageSmoothingEnabled = true;
+      tempCtx.imageSmoothingQuality = 'high';
+      tempCtx.drawImage(backSvgRef.current, x, y, svgWidth, svgHeight);
+    }
     
     // Get current step's SVG index
     const currentStepData = currentStep > 0 ? steps[currentStep] : null;
@@ -874,6 +905,25 @@ function Canvas({ language, onClose }) {
     
     const currentSvgIndex = currentStepData.svgIndex;
     
+    // Draw back.svg first (at the very bottom, always visible)
+    if (backSvgRef.current && backSvgRef.current.complete) {
+      const centerX = displayWidth / 2;
+      const centerY = displayHeight / 2;
+      const offsetX = -150;
+      const startX = centerX + offsetX;
+      const startY = centerY;
+      const baseWidth = 655;
+      const baseHeight = 493;
+      const scale = 1.2;
+      const svgWidth = baseWidth * scale;
+      const svgHeight = baseHeight * scale;
+      const x = startX - svgWidth / 2;
+      const y = startY - svgHeight / 2;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(backSvgRef.current, x, y, svgWidth, svgHeight);
+    }
+    
     // Draw all SVGs from Set 2 EXCEPT the current step's SVG and bugs SVG (these go below current step's Set 1 SVG)
     const svgImagesSet2 = svgImagesSet2Ref.current;
     const bugsIndex = 5; // Bugs step SVG index
@@ -1028,7 +1078,6 @@ function Canvas({ language, onClose }) {
       
       // Draw bugs SVG on top of everything (but below brush strokes)
       if (svgImagesSet2 && svgImagesSet2[bugsIndex]) {
-        const coloredBugsSvg = coloredSvgsRef.current[bugsIndex];
         const centerX = displayWidth / 2;
         const centerY = displayHeight / 2;
         const offsetX = -150;
@@ -1045,8 +1094,8 @@ function Canvas({ language, onClose }) {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         
-        if (coloredBugsSvg && coloredBugsSvg.complete) {
-          // Use the colored version
+        // If we just filled the bugs SVG (current step is bugs), draw directly from tempCanvas
+        if (currentSvgIndex === bugsIndex) {
           const x = startX - svgWidth / 2;
           const y = startY - svgHeight / 2;
           
@@ -1055,16 +1104,33 @@ function Canvas({ language, onClose }) {
           const highResWidth = 655 * highResScale;
           const highResHeight = 493 * highResScale;
           
-          // Draw from high-res source to display size
-          ctx.drawImage(coloredBugsSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
+          // Draw from high-res tempCanvas to display size
+          ctx.drawImage(tempCanvas, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
         } else {
-          // Use the original SVG
-          const bugsSvg = svgImagesSet2[bugsIndex];
+          // For other steps, check if we have a colored bugs SVG from previous fills
+          const coloredBugsSvg = coloredSvgsRef.current[bugsIndex];
           
-          if (bugsSvg && bugsSvg.complete) {
+          if (coloredBugsSvg && coloredBugsSvg.complete) {
+            // Use the colored version
             const x = startX - svgWidth / 2;
             const y = startY - svgHeight / 2;
-            ctx.drawImage(bugsSvg, x, y, svgWidth, svgHeight);
+            
+            // Calculate the high-res dimensions
+            const highResScale = 4;
+            const highResWidth = 655 * highResScale;
+            const highResHeight = 493 * highResScale;
+            
+            // Draw from high-res source to display size
+            ctx.drawImage(coloredBugsSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
+          } else {
+            // Use the original SVG
+            const bugsSvg = svgImagesSet2[bugsIndex];
+            
+            if (bugsSvg && bugsSvg.complete) {
+              const x = startX - svgWidth / 2;
+              const y = startY - svgHeight / 2;
+              ctx.drawImage(bugsSvg, x, y, svgWidth, svgHeight);
+            }
           }
         }
       }
@@ -2008,4 +2074,5 @@ function Canvas({ language, onClose }) {
 }
 
 export default Canvas;
+
 
