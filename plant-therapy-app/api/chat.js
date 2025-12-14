@@ -46,8 +46,8 @@ export default async function handler(req, res) {
 
     // Validate message format
     for (const msg of messages) {
-      if (!msg.role || !msg.content) {
-        return res.status(400).json({ error: 'Invalid message format' });
+      if (!msg.role || msg.content === undefined) {
+        return res.status(400).json({ error: 'Invalid message format: each message needs role and content' });
       }
     }
 
@@ -110,27 +110,58 @@ async function handleChatRequest(req, res, { apiKey, model, messages, temperatur
   return res.status(200).json(data);
 }
 
+// Convert Chat Completions message format to Responses API format
+function convertToResponsesFormat(msg) {
+  const isUser = msg.role === 'user';
+  const textType = isUser ? 'input_text' : 'output_text';
+  
+  if (Array.isArray(msg.content)) {
+    // Multi-part content (text + image)
+    return {
+      role: msg.role,
+      content: msg.content.map(part => {
+        if (part.type === 'text') {
+          return { type: textType, text: part.text };
+        } else if (part.type === 'image_url') {
+          // Images only make sense for user messages
+          return { 
+            type: 'input_image', 
+            image_url: part.image_url.url,
+            detail: part.image_url.detail || 'auto'
+          };
+        }
+        return part;
+      })
+    };
+  } else {
+    // Simple text content
+    return {
+      role: msg.role,
+      content: [{ type: textType, text: msg.content }]
+    };
+  }
+}
+
 // Handle Responses API request with RAG (file search)
 async function handleRAGRequest(req, res, { apiKey, model, messages, temperature, max_tokens, vectorStoreId }) {
-  // Convert chat messages format to Responses API input format
-  // The Responses API expects a different structure
-  
   // Extract system message if present
   const systemMessage = messages.find(m => m.role === 'system');
   const otherMessages = messages.filter(m => m.role !== 'system');
   
-  // Build input for Responses API
-  // For multi-turn conversations, we need to format properly
+  // Build input for Responses API with proper format conversion
   let input;
   if (otherMessages.length === 1) {
-    // Single message - just use content directly
-    input = otherMessages[0].content;
+    // Single message - can be string or formatted content
+    const msg = otherMessages[0];
+    if (typeof msg.content === 'string') {
+      input = msg.content;  // Simple string input
+    } else {
+      // Array content - convert to Responses API format
+      input = convertToResponsesFormat(msg).content;
+    }
   } else {
-    // Multi-turn conversation - format as conversation
-    input = otherMessages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }));
+    // Multi-turn conversation - convert each message
+    input = otherMessages.map(convertToResponsesFormat);
   }
 
   const requestBody = {
@@ -139,18 +170,31 @@ async function handleRAGRequest(req, res, { apiKey, model, messages, temperature
     tools: [{
       type: 'file_search',
       vector_store_ids: [vectorStoreId],
-      max_num_results: 10  // Retrieve up to 10 relevant chunks
+      max_num_results: 10
     }],
+    // Force the model to use file_search tool
+    tool_choice: {
+      type: 'file_search'
+    },
+    // Include search results in response
+    include: ['file_search_call.results'],
     temperature,
-    max_output_tokens: max_tokens,
-    include: ['file_search_call.results']  // Include search results for transparency
+    max_output_tokens: max_tokens
   };
 
   // Add system instructions if present
   if (systemMessage) {
-    requestBody.instructions = typeof systemMessage.content === 'string' 
+    const baseInstructions = typeof systemMessage.content === 'string' 
       ? systemMessage.content 
       : systemMessage.content[0]?.text || '';
+    
+    requestBody.instructions = baseInstructions + `
+
+IMPORTANT: You MUST search the Plant Metaphor Database knowledge base for EVERY response. Look for:
+- Relevant plant metaphors that match the user's situation
+- Therapeutic techniques and prompts from the database
+- Specific plant imagery and symbolism that resonates with their experience
+Always incorporate the knowledge base content naturally in your responses.`;
   }
 
   console.log('RAG Request to Responses API:', JSON.stringify(requestBody, null, 2));
@@ -177,7 +221,6 @@ async function handleRAGRequest(req, res, { apiKey, model, messages, temperature
   console.log('RAG Response:', JSON.stringify(data, null, 2));
 
   // Transform Responses API format to match Chat Completions format for compatibility
-  // This allows the frontend to handle both response types uniformly
   const transformedResponse = transformResponsesAPIOutput(data);
   
   return res.status(200).json(transformedResponse);
@@ -214,7 +257,7 @@ function transformResponsesAPIOutput(responsesData) {
     }));
 
   // Extract search results for context
-  const searchResults = fileSearchOutput?.search_results || [];
+  const searchResults = fileSearchOutput?.results || [];
 
   return {
     id: responsesData.id,
