@@ -1,20 +1,35 @@
 // LLM Service for Tree of Life therapy chat
 // This service can be configured to use different LLM providers (OpenAI, Claude, etc.)
+// Supports RAG (Retrieval-Augmented Generation) using OpenAI's file search
 
 class LLMService {
   constructor() {
     // Configuration
-    // For local development: uses REACT_APP_OPENAI_API_KEY from .env.local
+    // For local development: uses REACT_APP_OPENAI_API_KEY from .env.local with direct API calls
     // For production (Vercel): uses /api/chat serverless function proxy
-    this.useProxy = process.env.NODE_ENV === 'production' || process.env.REACT_APP_USE_PROXY === 'true';
+    // Use proxy only in production OR if explicitly enabled with REACT_APP_USE_PROXY=true
+    this.useProxy = process.env.NODE_ENV === 'production';
     this.apiKey = process.env.REACT_APP_OPENAI_API_KEY || '';
-    this.apiEndpoint = this.useProxy ? '/api/chat' : 'https://api.openai.com/v1/chat/completions';
+    this.apiEndpoint = this.useProxy ? '/api/chat' : 'https://api.openai.com/v1/responses';
     // Use gpt-4o by default as it supports vision
     this.model = process.env.REACT_APP_OPENAI_MODEL || 'gpt-4o';
     
-    // System prompt for Tree of Life therapy context
+    // RAG Configuration
+    // Vector Store ID for Plant Metaphor Database knowledge base
+    this.vectorStoreId = process.env.REACT_APP_VECTOR_STORE_ID || 'vs_693ea08673fc81918d169ba18b9e977a';
+    // Enable RAG by default - set to false to disable knowledge base search
+    this.useRAG = process.env.REACT_APP_USE_RAG !== 'false';
+    
+    console.log(`LLM Service initialized: useProxy=${this.useProxy}, useRAG=${this.useRAG}, model=${this.model}`);
+    
+    // System prompt for Tree of Life therapy context with RAG enhancement
     this.systemPrompt = {
       en: `You are a compassionate and supportive therapy assistant guiding someone through the "Tree of Life" metaphor therapy exercise. 
+
+You have access to a comprehensive Plant Metaphor Database knowledge base. When relevant, use this knowledge to:
+- Suggest appropriate plant metaphors that resonate with the user's experience
+- Provide therapeutic guidance based on established plant therapy techniques
+- Offer creative prompts using plant imagery that matches the user's emotional state
 
 The Tree of Life is a narrative-based activity where people draw a tree to represent their life story:
 - Roots: origins, family, culture, values, important places
@@ -31,12 +46,18 @@ Your role is to:
 3. Be encouraging and validating - acknowledge their effort and creativity
 4. Help them reflect on what their drawing reveals about their experiences
 5. If something seems missing or unclear in their drawing, gently invite them to add more detail
-6. Never judge or provide medical advice
-7. Keep responses concise and supportive (2-4 sentences max)
-8. Use the tree metaphor naturally in your guidance
+6. Draw upon the Plant Metaphor Database to suggest relevant metaphors and therapeutic techniques
+7. Never judge or provide medical advice
+8. Keep responses concise and supportive (2-4 sentences max)
+9. Use the tree metaphor naturally in your guidance
 
 Current stage: {stage}`,
       cn: `你是一位富有同理心和支持性的疗愈助手，正在引导来访者完成"生命之树"隐喻疗愈练习。
+
+你可以访问一个全面的植物隐喻数据库知识库。在相关时，请使用这些知识来：
+- 建议与用户体验相呼应的适当植物隐喻
+- 基于已建立的植物疗法技术提供治疗指导
+- 使用与用户情绪状态匹配的植物意象提供创意提示
 
 生命之树是一种叙事性活动，人们通过绘制树来表达生命故事：
 - 根：起源、家庭、文化、价值观、重要的地方
@@ -53,9 +74,10 @@ Current stage: {stage}`,
 3. 给予鼓励和认可 - 肯定他们的努力和创造力
 4. 帮助他们反思绘画所揭示的经历和感受
 5. 如果绘画中某些内容缺失或不清晰，温和地邀请他们添加更多细节
-6. 绝不评判或提供医疗建议
-7. 保持回应简洁且支持性（最多2-4句话）
-8. 在引导中自然地使用树的隐喻
+6. 从植物隐喻数据库中提取相关的隐喻和治疗技术
+7. 绝不评判或提供医疗建议
+8. 保持回应简洁且支持性（最多2-4句话）
+9. 在引导中自然地使用树的隐喻
 
 当前阶段：{stage}`
     };
@@ -123,9 +145,11 @@ Current stage: {stage}`,
       ];
 
       let response;
+      let data;
       
       if (this.useProxy) {
         // Use proxy endpoint (for Vercel production)
+        // Include RAG flag to enable knowledge base search
         response = await fetch(this.apiEndpoint, {
           method: 'POST',
           headers: {
@@ -135,32 +159,189 @@ Current stage: {stage}`,
             messages: allMessages,
             requestedModel: this.model,
             temperature: 0.7,
-            max_tokens: 500
+            max_tokens: 500,
+            useRAG: this.useRAG  // Enable RAG mode
           })
         });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(`API request failed: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+        }
+
+        data = await response.json();
+        
+        // Log RAG metadata if available (for debugging)
+        if (data.rag_metadata) {
+          console.log('RAG Search Results:', data.rag_metadata);
+        }
+        
       } else {
         // Direct API call (for local development)
-        response = await fetch(this.apiEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`
-          },
-          body: JSON.stringify({
+        // Use Responses API with file search for RAG
+        if (this.useRAG) {
+          console.log('Using Responses API with RAG for local development');
+          
+          // Extract system message
+          const systemMessage = allMessages.find(m => m.role === 'system');
+          const otherMessages = allMessages.filter(m => m.role !== 'system');
+          
+          // Convert messages to Responses API format
+          // Responses API uses different content types based on role:
+          // - user messages: 'input_text' for text, 'input_image' for images
+          // - assistant messages: 'output_text' for text
+          const convertToResponsesFormat = (msg) => {
+            const isUser = msg.role === 'user';
+            const textType = isUser ? 'input_text' : 'output_text';
+            
+            if (Array.isArray(msg.content)) {
+              // Multi-part content (text + image)
+              return {
+                role: msg.role,
+                content: msg.content.map(part => {
+                  if (part.type === 'text') {
+                    return { type: textType, text: part.text };
+                  } else if (part.type === 'image_url') {
+                    // Images only make sense for user messages
+                    return { 
+                      type: 'input_image', 
+                      image_url: part.image_url.url,
+                      detail: part.image_url.detail || 'auto'
+                    };
+                  }
+                  return part;
+                })
+              };
+            } else {
+              // Simple text content
+              return {
+                role: msg.role,
+                content: [{ type: textType, text: msg.content }]
+              };
+            }
+          };
+          
+          // Build input for Responses API
+          let input;
+          if (otherMessages.length === 1) {
+            // Single message - can be string or formatted content
+            const msg = otherMessages[0];
+            if (typeof msg.content === 'string') {
+              input = msg.content;  // Simple string input
+            } else {
+              // Array content - convert to Responses API format
+              input = convertToResponsesFormat(msg).content;
+            }
+          } else {
+            // Multi-turn conversation
+            input = otherMessages.map(convertToResponsesFormat);
+          }
+
+          const requestBody = {
             model: this.model,
-            messages: allMessages,
+            input,
+            tools: [{
+              type: 'file_search',
+              vector_store_ids: [this.vectorStoreId],
+              max_num_results: 10
+            }],
+            // Force the model to use file_search tool
+            tool_choice: {
+              type: 'file_search'
+            },
+            // Include search results in response for debugging/transparency
+            include: ['file_search_call.results'],
             temperature: 0.7,
-            max_tokens: 500
-          })
-        });
+            max_output_tokens: 500
+          };
+
+          if (systemMessage) {
+            // Add explicit instruction to use knowledge base
+            const baseInstructions = typeof systemMessage.content === 'string' 
+              ? systemMessage.content 
+              : systemMessage.content[0]?.text || '';
+            
+            requestBody.instructions = baseInstructions + `
+
+IMPORTANT: You MUST search the Plant Metaphor Database knowledge base for EVERY response. Look for:
+- Relevant plant metaphors that match the user's situation
+- Therapeutic techniques and prompts from the database
+- Specific plant imagery and symbolism that resonates with their experience
+Always incorporate the knowledge base content naturally in your responses.`;
+          }
+
+          console.log('Responses API request:', JSON.stringify(requestBody, null, 2));
+
+          response = await fetch('https://api.openai.com/v1/responses', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.apiKey}`
+            },
+            body: JSON.stringify(requestBody)
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`API request failed: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+          }
+
+          data = await response.json();
+          console.log('Responses API response:', JSON.stringify(data, null, 2));
+          
+          // Log file search results if available
+          const fileSearchOutput = data.output?.find(item => item.type === 'file_search_call');
+          if (fileSearchOutput) {
+            console.log('📚 RAG File Search Results:');
+            console.log('  Queries:', fileSearchOutput.queries);
+            if (fileSearchOutput.results) {
+              console.log('  Results found:', fileSearchOutput.results.length);
+              fileSearchOutput.results.forEach((result, i) => {
+                console.log(`  [${i+1}] ${result.filename} (score: ${result.score?.toFixed(3)})`);
+                console.log(`      Preview: ${result.text?.substring(0, 150)}...`);
+              });
+            }
+          } else {
+            console.warn('⚠️ No file_search_call in response - RAG may not have been used');
+          }
+          
+          // Extract text from Responses API format
+          const messageOutput = data.output?.find(item => item.type === 'message');
+          if (messageOutput?.content) {
+            for (const content of messageOutput.content) {
+              if (content.type === 'output_text') {
+                return content.text;
+              }
+            }
+          }
+          return 'No response generated';
+          
+        } else {
+          // Standard Chat Completions API (no RAG)
+          response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.apiKey}`
+            },
+            body: JSON.stringify({
+              model: this.model,
+              messages: allMessages,
+              temperature: 0.7,
+              max_tokens: 500
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`API request failed: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+          }
+
+          data = await response.json();
+          return data.choices[0].message.content;
+        }
       }
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`API request failed: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
-      }
-
-      const data = await response.json();
       return data.choices[0].message.content;
     } catch (error) {
       console.error('LLM API Error:', error);
@@ -168,6 +349,21 @@ Current stage: {stage}`,
     }
   }
 
+  // Get the last RAG search results (for debugging/transparency)
+  getLastRAGMetadata() {
+    return this.lastRAGMetadata;
+  }
+
+  // Enable or disable RAG mode
+  setRAGEnabled(enabled) {
+    this.useRAG = enabled;
+    console.log(`RAG mode ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  // Check if RAG is enabled
+  isRAGEnabled() {
+    return this.useRAG;
+  }
 }
 
 // Create singleton instance
@@ -175,4 +371,3 @@ const llmServiceInstance = new LLMService();
 
 // Export the instance
 export default llmServiceInstance;
-
