@@ -1178,6 +1178,11 @@ function Canvas({ language, onClose }) {
       return;
     }
     
+    // If using text tool, don't draw - only allow moving text labels
+    if (currentTool === 'text') {
+      return;
+    }
+    
     // If using fill tool, fill the current step's SVG and return
     if (currentTool === 'fill') {
       fillCurrentStepSvg(currentColor);
@@ -1373,6 +1378,9 @@ function Canvas({ language, onClose }) {
       const newTexts = [...canvasTexts, newText];
       setCanvasTexts(newTexts);
       setTempTextIndex(newTexts.length - 1); // Set as the current temporary text
+      
+      // Switch to text tool so user can move the text without accidentally drawing
+      setCurrentTool('text');
       
       setTextInputValue('');
       setShowTextInput(false);
@@ -1760,6 +1768,7 @@ function Canvas({ language, onClose }) {
             style={{ 
               cursor: draggingTextIndex !== null ? 'grabbing' : 
                      hoveringTextIndex !== null ? 'grab' : 
+                     currentTool === 'text' ? 'default' :
                      'crosshair' 
             }}
           />
