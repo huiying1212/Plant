@@ -170,14 +170,10 @@ async function handleRAGRequest(req, res, { apiKey, model, messages, temperature
     tools: [{
       type: 'file_search',
       vector_store_ids: [vectorStoreId],
-      max_num_results: 10
+      max_num_results: 5  // Reduced for faster response
     }],
-    // Force the model to use file_search tool
-    tool_choice: {
-      type: 'file_search'
-    },
-    // Include search results in response
-    include: ['file_search_call.results'],
+    // Let model decide when to use file_search (faster than forcing)
+    tool_choice: 'auto',
     temperature,
     max_output_tokens: max_tokens
   };
