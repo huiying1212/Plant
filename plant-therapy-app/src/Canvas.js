@@ -1357,11 +1357,14 @@ function Canvas({ language, onClose }) {
     if (textInputValue.trim()) {
       const canvas = canvasRef.current;
       
-      // Add text near the center of the canvas
+      // Add text near the center of the canvas with small random offset to avoid overlap
+      const randomOffsetX = (Math.random() - 0.5) * 60;  // -30 to +30 pixels
+      const randomOffsetY = (Math.random() - 0.5) * 60;  // -30 to +30 pixels
+      
       const newText = {
         text: textInputValue,
-        x: canvas.width / 2 - 100,
-        y: canvas.height / 2 + canvasTexts.length * 40,
+        x: canvas.width / 2 - 50 + randomOffsetX,
+        y: canvas.height / 2 + randomOffsetY,
         color: '#000000', // Fixed black color for all text labels
         fontSize: 24,
         isTemporary: true // Mark as temporary until user confirms
