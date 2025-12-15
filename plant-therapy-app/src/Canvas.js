@@ -5,7 +5,8 @@ import ttsService from './ttsService';
 import sttService from './sttService';
 
 function Canvas({ language, onClose }) {
-  const canvasRef = useRef(null);
+  const canvasRef = useRef(null);  // Top layer: user drawing (erasable)
+  const baseCanvasRef = useRef(null);  // Bottom layer: SVG template (non-erasable)
   const chatMessagesEndRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentTool, setCurrentTool] = useState('pen'); // pen, fill, eraser, text
@@ -158,25 +159,34 @@ function Canvas({ language, onClose }) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (canvas) {
-      // Initial setup with high DPI support
+    const baseCanvas = baseCanvasRef.current;
+    if (canvas && baseCanvas) {
+      // Initial setup with high DPI support for both canvases
       const ctx = canvas.getContext('2d');
+      const baseCtx = baseCanvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
       
-      // Set canvas size accounting for device pixel ratio
+      // Set canvas size accounting for device pixel ratio - TOP LAYER (user drawing)
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
-      
-      // Scale context to match device pixel ratio
       ctx.scale(dpr, dpr);
-      
-      // Set canvas display size
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
       
-      ctx.fillStyle = '#F5F5F5';
-      ctx.fillRect(0, 0, rect.width, rect.height);
+      // Set canvas size accounting for device pixel ratio - BASE LAYER (SVG template)
+      baseCanvas.width = rect.width * dpr;
+      baseCanvas.height = rect.height * dpr;
+      baseCtx.scale(dpr, dpr);
+      baseCanvas.style.width = `${rect.width}px`;
+      baseCanvas.style.height = `${rect.height}px`;
+      
+      // Fill base canvas with background color (SVG layer)
+      baseCtx.fillStyle = '#F5F5F5';
+      baseCtx.fillRect(0, 0, rect.width, rect.height);
+      
+      // Top layer is transparent (user drawing layer)
+      ctx.clearRect(0, 0, rect.width, rect.height);
       
       // Define SVG filenames shared by both sets
       const svgFiles = [
@@ -224,12 +234,12 @@ function Canvas({ language, onClose }) {
         const allLoadedSet2 = svgImagesSet2.every((img) => img && img.complete);
         
         if (allLoadedSet2 && loadedCountSet2 === svgFiles.length) {
-          // Draw all set 2 SVGs at the same position to form a complete tree
+          // Draw all set 2 SVGs on the BASE canvas (non-erasable layer)
           const scale = 1.2; // Scale factor to make SVGs larger (2x = double size)
           
           // Enable high quality image smoothing for crisp SVG rendering
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
+          baseCtx.imageSmoothingEnabled = true;
+          baseCtx.imageSmoothingQuality = 'high';
           
           // Draw back.svg first (at the very bottom)
           if (backSvgRef.current && backSvgRef.current.complete) {
@@ -239,7 +249,7 @@ function Canvas({ language, onClose }) {
             const svgHeight = baseHeight * scale;
             const x = startX - svgWidth / 2;
             const y = startY - svgHeight / 2;
-            ctx.drawImage(backSvgRef.current, x, y, svgWidth, svgHeight);
+            baseCtx.drawImage(backSvgRef.current, x, y, svgWidth, svgHeight);
           }
           
           svgImagesSet2.forEach((svgImg) => {
@@ -255,16 +265,14 @@ function Canvas({ language, onClose }) {
               const y = startY - svgHeight / 2;
               
               // Draw the SVG image with scaled size while maintaining aspect ratio
-              ctx.drawImage(svgImg, x, y, svgWidth, svgHeight);
+              baseCtx.drawImage(svgImg, x, y, svgWidth, svgHeight);
             }
           });
           
           set2Drawn = true;
           initialDrawnRef.current = true;
-          // Save initial state to history
-          const newHistory = [canvas.toDataURL()];
-          setHistory(newHistory);
-          setHistoryStep(0);
+          // Save initial state to history (combine both canvases)
+          saveCanvasState();
         }
       };
       
@@ -309,36 +317,53 @@ function Canvas({ language, onClose }) {
         imgSet2.src = `/canvas/2/${encodeURIComponent(svgFile)}`;
       });
       
-      // Handle resize - preserve existing content
+      // Handle resize - preserve existing content for both canvases
       const resizeCanvas = () => {
-        const currentImage = canvas.toDataURL();
-        const img = new Image();
-        img.onload = () => {
+        const currentBaseImage = baseCanvas.toDataURL();
+        const currentUserImage = canvas.toDataURL();
+        
+        const baseImg = new Image();
+        const userImg = new Image();
+        let loadedCount = 0;
+        
+        const onBothLoaded = () => {
+          loadedCount++;
+          if (loadedCount < 2) return;
+          
           const dpr = window.devicePixelRatio || 1;
           const newRect = canvas.getBoundingClientRect();
           const oldWidth = canvas.width / dpr;
           const oldHeight = canvas.height / dpr;
           
+          // Resize base canvas
+          baseCanvas.width = newRect.width * dpr;
+          baseCanvas.height = newRect.height * dpr;
+          const newBaseCtx = baseCanvas.getContext('2d');
+          newBaseCtx.scale(dpr, dpr);
+          baseCanvas.style.width = `${newRect.width}px`;
+          baseCanvas.style.height = `${newRect.height}px`;
+          newBaseCtx.fillStyle = '#F5F5F5';
+          newBaseCtx.fillRect(0, 0, newRect.width, newRect.height);
+          newBaseCtx.drawImage(baseImg, 0, 0, oldWidth, oldHeight, 0, 0, oldWidth, oldHeight);
+          
+          // Resize user canvas
           canvas.width = newRect.width * dpr;
           canvas.height = newRect.height * dpr;
-          
           const newCtx = canvas.getContext('2d');
           newCtx.scale(dpr, dpr);
-          
           canvas.style.width = `${newRect.width}px`;
           canvas.style.height = `${newRect.height}px`;
+          newCtx.clearRect(0, 0, newRect.width, newRect.height);
+          newCtx.drawImage(userImg, 0, 0, oldWidth, oldHeight, 0, 0, oldWidth, oldHeight);
           
-          newCtx.fillStyle = '#F5F5F5';
-          newCtx.fillRect(0, 0, newRect.width, newRect.height);
-          // Draw the old content
-          newCtx.drawImage(img, 0, 0, oldWidth, oldHeight, 0, 0, oldWidth, oldHeight);
           // Save to history after resize
-          const newHistory = history.slice(0, historyStep + 1);
-          newHistory.push(canvas.toDataURL());
-          setHistory(newHistory);
-          setHistoryStep(newHistory.length - 1);
+          saveCanvasState();
         };
-        img.src = currentImage;
+        
+        baseImg.onload = onBothLoaded;
+        userImg.onload = onBothLoaded;
+        baseImg.src = currentBaseImage;
+        userImg.src = currentUserImage;
       };
       
       window.addEventListener('resize', resizeCanvas);
@@ -355,22 +380,23 @@ function Canvas({ language, onClose }) {
     if (!svgsLoadedRef.current) return;
     
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const baseCanvas = baseCanvasRef.current;
+    if (!canvas || !baseCanvas) return;
     
-    const ctx = canvas.getContext('2d');
+    const baseCtx = baseCanvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     
     // Reset globalAlpha to ensure SVGs are drawn with full opacity
-    ctx.globalAlpha = 1;
+    baseCtx.globalAlpha = 1;
     
     // Get display dimensions
-    const displayWidth = canvas.width / dpr;
-    const displayHeight = canvas.height / dpr;
+    const displayWidth = baseCanvas.width / dpr;
+    const displayHeight = baseCanvas.height / dpr;
     
     // Create a temporary high-resolution canvas for drawing SVGs
     const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = canvas.width;  // Use full physical pixel width
-    tempCanvas.height = canvas.height; // Use full physical pixel height
+    tempCanvas.width = baseCanvas.width;  // Use full physical pixel width
+    tempCanvas.height = baseCanvas.height; // Use full physical pixel height
     const tempCtx = tempCanvas.getContext('2d');
     tempCtx.scale(dpr, dpr); // Scale the context to work in display coordinates
     
@@ -513,19 +539,22 @@ function Canvas({ language, onClose }) {
       }
     }
     
-    // Clear the main canvas and draw the new SVG layer
-    ctx.clearRect(0, 0, displayWidth, displayHeight);
-    // Draw the high-res temp canvas at display size (ctx is already scaled)
-    ctx.drawImage(tempCanvas, 0, 0, displayWidth, displayHeight);
+    // Clear the BASE canvas and draw the new SVG layer
+    baseCtx.clearRect(0, 0, displayWidth, displayHeight);
+    // Draw the high-res temp canvas at display size (baseCtx is already scaled)
+    baseCtx.drawImage(tempCanvas, 0, 0, displayWidth, displayHeight);
     
-    // Redraw all brush strokes from the array on top of the new SVGs
+    // Get the user canvas context for redrawing brush strokes
+    const ctx = canvas.getContext('2d');
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    
+    // Clear and redraw all brush strokes on the USER canvas (top layer)
+    ctx.clearRect(0, 0, displayWidth, displayHeight);
     redrawBrushStrokes(ctx);
     
-    // Save to history
-    const newHistory = history.slice(0, historyStep + 1);
-    newHistory.push(canvas.toDataURL());
-    setHistory(newHistory);
-    setHistoryStep(newHistory.length - 1);
+    // Save combined state to history
+    saveCanvasState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, steps]);
 
@@ -605,35 +634,17 @@ function Canvas({ language, onClose }) {
     const displayWidth = canvas.width / dpr;
     const displayHeight = canvas.height / dpr;
     
-    // First restore the base canvas from history (SVGs and fills, but not brush strokes or texts)
-    if (history.length > 0 && historyStep >= 0) {
-      const img = new Image();
-      img.src = history[historyStep];
-      img.onload = () => {
-        ctx.clearRect(0, 0, displayWidth, displayHeight);
-        // Draw the high-res history image at display size (ctx is already scaled)
-        ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
-        
-        // Note: The history image already contains brush strokes, so we don't need to redraw them here
-        // The brush strokes were saved as part of the canvas when saveToHistory was called
-        
-        // Then draw all text elements on top
-        canvasTexts.forEach((textObj) => {
-          ctx.font = `${textObj.fontSize || 24}px Avenir, sans-serif`;
-          ctx.fillStyle = textObj.color;
-          ctx.textBaseline = 'top';
-          ctx.fillText(textObj.text, textObj.x, textObj.y);
-        });
-      };
-    } else {
-      // Just draw texts if no history
-      canvasTexts.forEach((textObj) => {
-        ctx.font = `${textObj.fontSize || 24}px Avenir, sans-serif`;
-        ctx.fillStyle = textObj.color;
-        ctx.textBaseline = 'top';
-        ctx.fillText(textObj.text, textObj.x, textObj.y);
-      });
-    }
+    // Clear the user canvas and redraw brush strokes
+    ctx.clearRect(0, 0, displayWidth, displayHeight);
+    redrawBrushStrokes(ctx);
+    
+    // Draw all text elements on the user canvas (on top of brush strokes)
+    canvasTexts.forEach((textObj) => {
+      ctx.font = `${textObj.fontSize || 24}px Avenir, sans-serif`;
+      ctx.fillStyle = textObj.color;
+      ctx.textBaseline = 'top';
+      ctx.fillText(textObj.text, textObj.x, textObj.y);
+    });
   };
 
   // Redraw texts when canvasTexts changes or when dragging
@@ -642,14 +653,45 @@ function Canvas({ language, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasTexts, historyStep]);
 
-  const saveToHistory = () => {
+  // Get combined canvas image (base + user layers) as data URL
+  const getCombinedCanvasDataUrl = () => {
     const canvas = canvasRef.current;
-    if (canvas) {
+    const baseCanvas = baseCanvasRef.current;
+    if (canvas && baseCanvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const displayWidth = canvas.width / dpr;
+      const displayHeight = canvas.height / dpr;
+      
+      // Create a temporary canvas to combine both layers
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.scale(dpr, dpr);
+      
+      // Draw base layer first (SVG template)
+      tempCtx.drawImage(baseCanvas, 0, 0, displayWidth, displayHeight);
+      // Draw user layer on top
+      tempCtx.drawImage(canvas, 0, 0, displayWidth, displayHeight);
+      
+      return tempCanvas.toDataURL('image/png');
+    }
+    return null;
+  };
+
+  // Save combined canvas state (base + user layers) to history
+  const saveCanvasState = () => {
+    const dataUrl = getCombinedCanvasDataUrl();
+    if (dataUrl) {
       const newHistory = history.slice(0, historyStep + 1);
-      newHistory.push(canvas.toDataURL());
+      newHistory.push(dataUrl);
       setHistory(newHistory);
       setHistoryStep(newHistory.length - 1);
     }
+  };
+
+  const saveToHistory = () => {
+    saveCanvasState();
   };
 
   // Send message to LLM
@@ -886,16 +928,18 @@ function Canvas({ language, onClose }) {
     // Skip if on introduction step (no SVG to fill)
     if (currentStep === 0) return;
     
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    const baseCanvas = baseCanvasRef.current;
+    if (!baseCanvas) return;
+    
+    const ctx = baseCanvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
-    const displayWidth = canvas.width / dpr;
-    const displayHeight = canvas.height / dpr;
+    const displayWidth = baseCanvas.width / dpr;
+    const displayHeight = baseCanvas.height / dpr;
     
     // Reset globalAlpha to ensure SVGs are drawn with full opacity
     ctx.globalAlpha = 1;
     
-    // Clear canvas and redraw base tree except for the current step's SVG
+    // Clear base canvas and redraw base tree except for the current step's SVG
     ctx.fillStyle = '#F5F5F5';
     ctx.fillRect(0, 0, displayWidth, displayHeight);
     
@@ -1135,8 +1179,13 @@ function Canvas({ language, onClose }) {
         }
       }
       
-      // Redraw brush strokes on top of the filled SVG
-      redrawBrushStrokes(ctx);
+      // Redraw brush strokes on the USER canvas (top layer)
+      const userCanvas = canvasRef.current;
+      if (userCanvas) {
+        const userCtx = userCanvas.getContext('2d');
+        userCtx.clearRect(0, 0, displayWidth, displayHeight);
+        redrawBrushStrokes(userCtx);
+      }
       
       saveToHistory();
     }
@@ -1465,10 +1514,9 @@ function Canvas({ language, onClose }) {
     // For drawing steps (1-7), require submission before proceeding
     if (!hasSubmittedCurrentStep && currentStep > 0) {
       // First click: Save and submit drawing to GPT
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const canvasDataUrl = canvas.toDataURL('image/png');
-        
+      // Get combined canvas (base SVG + user drawing) for submission
+      const canvasDataUrl = getCombinedCanvasDataUrl();
+      if (canvasDataUrl) {
         // Create a message with the canvas image
         const currentStepData = steps[currentStep];
         const userSubmissionMessage = {
@@ -1756,8 +1804,14 @@ function Canvas({ language, onClose }) {
           </div>
         </div>
 
-        {/* Canvas */}
+        {/* Canvas - Dual Layer Structure */}
         <div className="canvas-wrapper">
+          {/* Base Layer: SVG Template (non-erasable) */}
+          <canvas
+            ref={baseCanvasRef}
+            className="base-canvas"
+          />
+          {/* Top Layer: User Drawing (erasable) */}
           <canvas
             ref={canvasRef}
             onMouseDown={startDrawing}

@@ -245,10 +245,12 @@ Current stage: {stage}`,
             tools: [{
               type: 'file_search',
               vector_store_ids: [this.vectorStoreId],
-              max_num_results: 5  // Reduced for faster response
+              max_num_results: 10
             }],
-            // Let model decide when to use file_search (faster)
-            tool_choice: 'auto',
+            // Force the model to use file_search tool
+            tool_choice: {
+              type: 'file_search'
+            },
             // Include search results in response for debugging/transparency
             include: ['file_search_call.results'],
             temperature: 0.7,
