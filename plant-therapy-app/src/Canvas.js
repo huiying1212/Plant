@@ -17,6 +17,15 @@ function Canvas({ language, onClose }) {
   const [colorBrightness, setColorBrightness] = useState(50);
   const [recentColors, setRecentColors] = useState(['#EA5851']);
   const [showColorWheel, setShowColorWheel] = useState(false);
+  const [isColorPanelCollapsed, setIsColorPanelCollapsed] = useState(true);
+  
+  // Separate color states for pen and fill tools
+  const [penColor, setPenColor] = useState('#EA5851');
+  const [penBaseColor, setPenBaseColor] = useState('#EA5851');
+  const [penBrightness, setPenBrightness] = useState(50);
+  const [fillColor, setFillColor] = useState('#4DABF7');
+  const [fillBaseColor, setFillBaseColor] = useState('#4DABF7');
+  const [fillBrightness, setFillBrightness] = useState(50);
   const [showTextInput, setShowTextInput] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [isMicrophoneOn, setIsMicrophoneOn] = useState(false);
@@ -43,9 +52,10 @@ function Canvas({ language, onClose }) {
   const [isLLMTyping, setIsLLMTyping] = useState(false);
 
   const colorPalette = [
-    '#EA5851', '#FF8C42', '#FFD93D', '#6BCF7F',
-    '#4ECDC4', '#45B7D1', '#2E3A87', '#9B59B6',
-    '#000000', '#FFFFFF'
+    // Row 1: Warm to cool spectrum
+    '#FF6B6B', '#FF8E72', '#FFA94D', '#FFD43B', '#A9E34B', '#69DB7C', '#38D9A9', '#3BC9DB', '#4DABF7',
+    // Row 2: Cool to purple + neutrals
+    '#748FFC', '#9775FA', '#DA77F2', '#F783AC', '#E599F7', '#868E96', '#495057', '#000000', '#FFFFFF'
   ];
 
   const colorWheelPalette = [
@@ -1286,7 +1296,7 @@ function Canvas({ language, onClose }) {
     
     // If using fill tool, fill the current step's SVG and return
     if (currentTool === 'fill') {
-      fillCurrentStepSvg(currentColor);
+      fillCurrentStepSvg(fillColor);
       return;
     }
     
@@ -1297,7 +1307,7 @@ function Canvas({ language, onClose }) {
     // Start capturing the stroke
     const newStroke = {
       tool: currentTool,
-      color: currentColor,
+      color: penColor,
       size: brushSize,
       opacity: brushOpacity,
       points: [{ x, y }]
@@ -1305,7 +1315,7 @@ function Canvas({ language, onClose }) {
     setCurrentStroke(newStroke);
     
     if (currentTool === 'pen') {
-      ctx.strokeStyle = currentColor;
+      ctx.strokeStyle = penColor;
       ctx.globalAlpha = brushOpacity / 100;
       ctx.lineWidth = brushSize;
       ctx.lineCap = 'round';
@@ -1444,32 +1454,57 @@ function Canvas({ language, onClose }) {
     return rgbToHex(newR, newG, newB);
   };
 
-  const selectColor = (color) => {
+  const selectColor = (color, tool = currentTool) => {
     setCurrentColor(color);
     setBaseColor(color);
     setColorBrightness(50); // Reset brightness to middle when selecting new color
+    
+    // Update tool-specific color state
+    if (tool === 'pen') {
+      setPenColor(color);
+      setPenBaseColor(color);
+      setPenBrightness(50);
+    } else if (tool === 'fill') {
+      setFillColor(color);
+      setFillBaseColor(color);
+      setFillBrightness(50);
+    }
+    
     if (!recentColors.includes(color)) {
       setRecentColors([color, ...recentColors.slice(0, 7)]);
     }
   };
 
-  const handleBrightnessChange = (brightness) => {
+  const handleBrightnessChange = (brightness, tool = currentTool) => {
     setColorBrightness(brightness);
-    const adjustedColor = adjustBrightness(baseColor, brightness);
-    setCurrentColor(adjustedColor);
+    
+    if (tool === 'pen') {
+      setPenBrightness(brightness);
+      const adjustedColor = adjustBrightness(penBaseColor, brightness);
+      setPenColor(adjustedColor);
+      setCurrentColor(adjustedColor);
+    } else if (tool === 'fill') {
+      setFillBrightness(brightness);
+      const adjustedColor = adjustBrightness(fillBaseColor, brightness);
+      setFillColor(adjustedColor);
+      setCurrentColor(adjustedColor);
+    } else {
+      const adjustedColor = adjustBrightness(baseColor, brightness);
+      setCurrentColor(adjustedColor);
+    }
   };
 
   const addTextToCanvas = () => {
     if (textInputValue.trim()) {
       const canvas = canvasRef.current;
       
-      // Add text near the center of the canvas with small random offset to avoid overlap
+      // Add text in the left-center area (SVG display area) with small random offset to avoid overlap
       const randomOffsetX = (Math.random() - 0.5) * 60;  // -30 to +30 pixels
       const randomOffsetY = (Math.random() - 0.5) * 60;  // -30 to +30 pixels
       
       const newText = {
         text: textInputValue,
-        x: canvas.width / 2 - 50 + randomOffsetX,
+        x: canvas.width * 0.35 + randomOffsetX,  // Shifted left to SVG area center
         y: canvas.height / 2 + randomOffsetY,
         color: '#000000', // Fixed black color for all text labels
         fontSize: 16,
@@ -1890,50 +1925,170 @@ function Canvas({ language, onClose }) {
       <div className="canvas-main">
         {/* Left Sidebar - Vertical Sliders and Tools */}
         <div className="left-sidebar">
-          <div className="vertical-slider-container">
-            <input 
-              type="range" 
-              min="1" 
-              max="50" 
-              value={brushSize} 
-              onChange={(e) => setBrushSize(e.target.value)}
-              className="vertical-slider"
-              style={{
-                '--slider-value': `${((brushSize - 1) / (50 - 1)) * 100}%`
-              }}
-            />
+          {/* Brush Size Slider */}
+          <div className="slider-group">
+            <div className="slider-icon" title={language === 'EN' ? 'Brush Size' : '笔刷大小'}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r={Math.max(3, brushSize / 5)} fill="currentColor" />
+              </svg>
+            </div>
+            <div className="vertical-slider-container">
+              <input 
+                type="range" 
+                min="1" 
+                max="50" 
+                value={brushSize} 
+                onChange={(e) => setBrushSize(e.target.value)}
+                className="vertical-slider"
+                style={{
+                  '--slider-value': `${((brushSize - 1) / (50 - 1)) * 100}%`
+                }}
+              />
+            </div>
           </div>
           
-          <div className="vertical-slider-container">
-            <input 
-              type="range" 
-              min="0" 
-              max="100" 
-              value={brushOpacity} 
-              onChange={(e) => setBrushOpacity(e.target.value)}
-              className="vertical-slider"
-              style={{
-                '--slider-value': `${brushOpacity}%`
-              }}
-            />
+          {/* Opacity Slider */}
+          <div className="slider-group">
+            <div className="slider-icon" title={language === 'EN' ? 'Opacity' : '透明度'}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" fill="currentColor" fillOpacity={brushOpacity / 100} />
+              </svg>
+            </div>
+            <div className="vertical-slider-container">
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={brushOpacity} 
+                onChange={(e) => setBrushOpacity(e.target.value)}
+                className="vertical-slider"
+                style={{
+                  '--slider-value': `${brushOpacity}%`
+                }}
+              />
+            </div>
           </div>
 
+          <div className="sidebar-divider"></div>
+
           <div className="vertical-tools">
-            <button 
-              className={`vertical-tool-btn ${currentTool === 'pen' ? 'active' : ''}`}
-              onClick={() => setCurrentTool('pen')}
-            >
-              <img src="/element/brush.svg" alt="Pen" />
-            </button>
-            <button 
-              className={`vertical-tool-btn ${currentTool === 'fill' ? 'active' : ''}`}
-              onClick={() => setCurrentTool('fill')}
-            >
-              <img src="/element/paint bucket.svg" alt="Fill" />
-            </button>
+            {/* Pen Tool with Color Indicator */}
+            <div className="tool-with-color">
+              <button 
+                className={`vertical-tool-btn pen-btn ${currentTool === 'pen' ? 'active' : ''}`}
+                onClick={() => {
+                  // Toggle color panel only when pen is already selected
+                  if (currentTool === 'pen') {
+                    setIsColorPanelCollapsed(!isColorPanelCollapsed);
+                  } else {
+                    // Switch to pen and close any open panel
+                    setCurrentTool('pen');
+                    setIsColorPanelCollapsed(true);
+                  }
+                }}
+                title={language === 'EN' ? 'Pen (click again to choose color)' : '画笔（再次点击选择颜色）'}
+              >
+                <img src="/element/brush.svg" alt="Pen" />
+                <div 
+                  className="color-indicator" 
+                  style={{ backgroundColor: penColor }}
+                ></div>
+              </button>
+              
+              {/* Color Panel - Expands from pen button */}
+              {!isColorPanelCollapsed && currentTool === 'pen' && (
+                <div className="pen-color-panel">
+                  {/* Brightness Slider */}
+                  <div className="pen-brightness">
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100" 
+                      value={penBrightness} 
+                      onChange={(e) => handleBrightnessChange(e.target.value, 'pen')}
+                      className="horizontal-brightness-slider"
+                      style={{
+                        background: `linear-gradient(to right, #1a1a1a, ${penBaseColor}, #ffffff)`
+                      }}
+                    />
+                  </div>
+                  
+                  {/* Color Grid */}
+                  <div className="pen-color-grid">
+                    {colorPalette.map((color, idx) => (
+                      <button
+                        key={idx}
+                        className={`pen-color-dot ${penColor === color ? 'active' : ''} ${color === '#FFFFFF' ? 'white-dot' : ''}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => selectColor(color, 'pen')}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Fill Tool with Color Indicator */}
+            <div className="tool-with-color">
+              <button 
+                className={`vertical-tool-btn fill-btn ${currentTool === 'fill' ? 'active' : ''}`}
+                onClick={() => {
+                  // Toggle color panel only when fill is already selected
+                  if (currentTool === 'fill') {
+                    setIsColorPanelCollapsed(!isColorPanelCollapsed);
+                  } else {
+                    // Switch to fill and close any open panel
+                    setCurrentTool('fill');
+                    setIsColorPanelCollapsed(true);
+                  }
+                }}
+                title={language === 'EN' ? 'Fill (click again to choose color)' : '填充（再次点击选择颜色）'}
+              >
+                <img src="/element/paint bucket.svg" alt="Fill" />
+                <div 
+                  className="color-indicator" 
+                  style={{ backgroundColor: fillColor }}
+                ></div>
+              </button>
+              
+              {/* Color Panel - Expands from fill button */}
+              {!isColorPanelCollapsed && currentTool === 'fill' && (
+                <div className="pen-color-panel">
+                  {/* Brightness Slider */}
+                  <div className="pen-brightness">
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100" 
+                      value={fillBrightness} 
+                      onChange={(e) => handleBrightnessChange(e.target.value, 'fill')}
+                      className="horizontal-brightness-slider"
+                      style={{
+                        background: `linear-gradient(to right, #1a1a1a, ${fillBaseColor}, #ffffff)`
+                      }}
+                    />
+                  </div>
+                  
+                  {/* Color Grid */}
+                  <div className="pen-color-grid">
+                    {colorPalette.map((color, idx) => (
+                      <button
+                        key={idx}
+                        className={`pen-color-dot ${fillColor === color ? 'active' : ''} ${color === '#FFFFFF' ? 'white-dot' : ''}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => selectColor(color, 'fill')}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <button 
               className={`vertical-tool-btn ${currentTool === 'eraser' ? 'active' : ''}`}
-              onClick={() => setCurrentTool('eraser')}
+              onClick={() => {
+                setCurrentTool('eraser');
+                setIsColorPanelCollapsed(true);
+              }}
             >
               <img src="/element/eraser.svg" alt="Eraser" />
             </button>
@@ -1942,6 +2097,7 @@ function Canvas({ language, onClose }) {
               onClick={() => {
                 setCurrentTool('text');
                 setShowTextInput(true);
+                setIsColorPanelCollapsed(true);
               }}
             >
               <img src="/element/keyboard.svg" alt="Text" />
@@ -1999,45 +2155,6 @@ function Canvas({ language, onClose }) {
           )}
         </div>
 
-        {/* Bottom Toolbar */}
-        <div className="bottom-toolbar">
-          <div className="bottom-left">
-            <button className="bottom-tool-btn">
-              <img src="/element/color picker.svg" alt="Color Picker" />
-            </button>
-            <button className="bottom-tool-btn" onClick={() => setShowColorWheel(true)}>
-              <img src="/element/color wheel.svg" alt="Color Wheel" />
-            </button>
-          </div>
-
-          <div className="bottom-center">
-            <div className="color-brightness-slider-container">
-              <input 
-                type="range" 
-                min="0" 
-                max="100" 
-                value={colorBrightness} 
-                onChange={(e) => handleBrightnessChange(e.target.value)}
-                className="color-brightness-slider"
-                style={{
-                  background: `linear-gradient(to right, #000000, ${baseColor}, #ffffff)`,
-                  verticalAlign: 'middle'
-                }}
-              />
-            </div>
-            <div className="color-palette-bottom">
-              {colorPalette.map((color, idx) => (
-                <button
-                  key={idx}
-                  className={`color-swatch-bottom ${currentColor === color ? 'active' : ''} ${color === '#FFFFFF' ? 'white-color' : ''}`}
-                  style={{ backgroundColor: color }}
-                  onClick={() => selectColor(color)}
-                />
-              ))}
-            </div>
-          </div>
-
-        </div>
 
         {/* Right Bottom Buttons - Above Bottom Toolbar */}
         <div className="right-bottom-buttons">

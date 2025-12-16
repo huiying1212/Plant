@@ -132,7 +132,7 @@ Current stage: {stage}`,
                   type: 'image_url',
                   image_url: {
                     url: msg.image,
-                    detail: 'high'
+                    detail: 'auto'
                   }
                 }
               ]
