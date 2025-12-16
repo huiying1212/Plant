@@ -12,7 +12,7 @@ class LLMService {
     this.apiKey = process.env.REACT_APP_OPENAI_API_KEY || '';
     this.apiEndpoint = this.useProxy ? '/api/chat' : 'https://api.openai.com/v1/responses';
     // Use gpt-4o by default as it supports vision
-    this.model = process.env.REACT_APP_OPENAI_MODEL || 'gpt-4o';
+    this.model = process.env.REACT_APP_OPENAI_MODEL || 'gpt-4o-mini';
     
     // RAG Configuration
     // Vector Store ID for Plant Metaphor Database knowledge base
@@ -95,7 +95,8 @@ Current stage: {stage}`,
       4: language === 'EN' ? 'leaves (relationships and connections)' : '树叶（关系与联系）',
       5: language === 'EN' ? 'fruits/flowers (achievements)' : '果实/花朵（成就）',
       6: language === 'EN' ? 'bugs (worries and imperfections)' : '虫子（担忧与不完美）',
-      7: language === 'EN' ? 'storms (challenges and changes)' : '风暴（挑战与变化）'
+      7: language === 'EN' ? 'storms (challenges and changes)' : '风暴（挑战与变化）',
+      8: language === 'EN' ? 'final reflection (closing summary of the complete tree)' : '最终反思（完整生命之树的结束总结）'
     };
     
     const prompt = language === 'EN' ? this.systemPrompt.en : this.systemPrompt.cn;

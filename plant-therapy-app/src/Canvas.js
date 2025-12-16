@@ -61,8 +61,8 @@ function Canvas({ language, onClose }) {
       titleCN: '生命之树',
       instructionEN: 'Welcome to your Tree of Life journey!',
       instructionCN: '欢迎来到你的生命之树旅程！',
-      descriptionEN: 'In this activity, we use the metaphor of a tree to explore your life.\n\nImagine yourself as a tree, with roots, a trunk, branches, leaves, flowers or fruits, and even bugs and storms.\n\nOn the screen, you\'ll find a tree template where you can add colors, patterns, or text to different parts of the tree. You can move your text around freely.',
-      descriptionCN: '在这个活动中，我们用树的比喻来探索你的生活。\n\n想象你自己是一棵树，有根、树干、树枝、树叶、花朵或果实，甚至还有虫子和风暴。\n\n在屏幕上，你会找到一个树的模板，你可以在树的不同部分添加颜色、图案或文字。你可以自由移动你的文字。',
+      descriptionEN: 'In this activity, we use the metaphor of a tree to explore your life.\n\nImagine yourself as a tree, with roots, a trunk, branches, leaves, flowers or fruits, and even bugs and storms.\n\nOn the screen, you\'ll find a tree template where you can add colors, patterns, or text to different parts of the tree. You can move your text around freely.\n\nClick “Next Step” to start your Tree of Life journey!',
+      descriptionCN: '在这个活动中，我们用树的比喻来探索你的生活。\n\n想象你自己是一棵树，有根、树干、树枝、树叶、花朵或果实，甚至还有虫子和风暴。\n\n在屏幕上，你会找到一个树的模板，你可以在树的不同部分添加颜色、图案或文字。你可以自由移动你的文字。\n\n点击“下一步”，来开启你的生命之树旅程！',
       exampleImage: null,
       svgIndex: null
     },
@@ -142,6 +142,18 @@ function Canvas({ language, onClose }) {
       descriptionCN: '最近有什么挑战或重大变化动摇了你的生活？\n\n想想财务压力、平衡工作和生活，或失去亲人等事情。',
       exampleImage: '/canvas/example/07 STORM.png',
       svgIndex: 6
+    },
+    {
+      stepNumber: 8,
+      titleEN: 'REFLECTION',
+      titleCN: '回顾总结',
+      instructionEN: 'Let\'s reflect on your complete Tree of Life.',
+      instructionCN: '让我们回顾你完整的生命之树。',
+      descriptionEN: 'You have completed all parts of your Tree of Life. Now let\'s take a moment to see your tree as a whole and reflect on this journey.',
+      descriptionCN: '你已经完成了生命之树的所有部分。现在让我们花点时间来看看你完整的树，并回顾这段旅程。',
+      exampleImage: null,
+      svgIndex: null,
+      isSummary: true
     }
   ], []);
 
@@ -264,11 +276,15 @@ function Canvas({ language, onClose }) {
               const x = startX - svgWidth / 2;
               const y = startY - svgHeight / 2;
               
+              // Set 30% opacity for Set 2 SVGs (70% transparency)
+              baseCtx.globalAlpha = 0.3;
               // Draw the SVG image with scaled size while maintaining aspect ratio
               baseCtx.drawImage(svgImg, x, y, svgWidth, svgHeight);
             }
           });
           
+          // Reset transparency
+          baseCtx.globalAlpha = 1.0;
           set2Drawn = true;
           initialDrawnRef.current = true;
           // Save initial state to history (combine both canvases)
@@ -447,17 +463,21 @@ function Canvas({ language, onClose }) {
           // Check if we have a colored version of this SVG
           const coloredSvg = coloredSvgsRef.current[index];
           if (coloredSvg && coloredSvg.complete) {
-            // Use the colored version with high-res dimensions
+            // Use the colored version - full opacity (user's work)
+            tempCtx.globalAlpha = 1.0;
             const highResScale = 4;
             const highResWidth = 655 * highResScale;
             const highResHeight = 493 * highResScale;
             tempCtx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
           } else {
-            // Use the original SVG
+            // Use the original SVG - 30% opacity (70% transparency)
+            tempCtx.globalAlpha = 0.3;
             tempCtx.drawImage(svgImg, x, y, svgWidth, svgHeight);
           }
         }
       });
+      // Reset transparency
+      tempCtx.globalAlpha = 1.0;
     }
     
     // If we're not on step 0 (introduction), draw the current step's SVG from Set 1
@@ -468,8 +488,12 @@ function Canvas({ language, onClose }) {
         const x = startX - svgWidth / 2;
         const y = startY - svgHeight / 2;
         
+        // Set 30% opacity for Set 1 SVG guide (70% transparency)
+        tempCtx.globalAlpha = 0.3;
         // Draw the specific SVG for this step from Set 1
         tempCtx.drawImage(svgImg, x, y, svgWidth, svgHeight);
+        // Reset transparency
+        tempCtx.globalAlpha = 1.0;
       }
     }
     
@@ -483,7 +507,8 @@ function Canvas({ language, onClose }) {
       tempCtx.imageSmoothingQuality = 'high';
       
       if (coloredSvg && coloredSvg.complete) {
-        // Use the colored version
+        // Use the colored version - full opacity (user's work)
+        tempCtx.globalAlpha = 1.0;
         const x = startX - svgWidth / 2;
         const y = startY - svgHeight / 2;
         
@@ -495,7 +520,8 @@ function Canvas({ language, onClose }) {
         // Draw from high-res source to display size
         tempCtx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
       } else {
-        // Use the original SVG
+        // Use the original SVG - 30% opacity (70% transparency)
+        tempCtx.globalAlpha = 0.3;
         const svgImg = svgImagesSet2[currentSvgIndex];
         
         if (svgImg && svgImg.complete) {
@@ -504,6 +530,8 @@ function Canvas({ language, onClose }) {
           tempCtx.drawImage(svgImg, x, y, svgWidth, svgHeight);
         }
       }
+      // Reset transparency
+      tempCtx.globalAlpha = 1.0;
     }
     
     // Draw bugs SVG on top of everything (but below brush strokes)
@@ -516,7 +544,8 @@ function Canvas({ language, onClose }) {
       tempCtx.imageSmoothingQuality = 'high';
       
       if (coloredBugsSvg && coloredBugsSvg.complete) {
-        // Use the colored version
+        // Use the colored version - full opacity (user's work)
+        tempCtx.globalAlpha = 1.0;
         const x = startX - svgWidth / 2;
         const y = startY - svgHeight / 2;
         
@@ -528,7 +557,8 @@ function Canvas({ language, onClose }) {
         // Draw from high-res source to display size
         tempCtx.drawImage(coloredBugsSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
       } else {
-        // Use the original SVG
+        // Use the original SVG - 30% opacity (70% transparency)
+        tempCtx.globalAlpha = 0.3;
         const bugsSvg = svgImagesSet2[bugsIndex];
         
         if (bugsSvg && bugsSvg.complete) {
@@ -537,6 +567,8 @@ function Canvas({ language, onClose }) {
           tempCtx.drawImage(bugsSvg, x, y, svgWidth, svgHeight);
         }
       }
+      // Reset transparency
+      tempCtx.globalAlpha = 1.0;
     }
     
     // Clear the BASE canvas and draw the new SVG layer
@@ -640,7 +672,7 @@ function Canvas({ language, onClose }) {
     
     // Draw all text elements on the user canvas (on top of brush strokes)
     canvasTexts.forEach((textObj) => {
-      ctx.font = `${textObj.fontSize || 24}px Avenir, sans-serif`;
+      ctx.font = `${textObj.fontSize || 16}px Avenir, sans-serif`;
       ctx.fillStyle = textObj.color;
       ctx.textBaseline = 'top';
       ctx.fillText(textObj.text, textObj.x, textObj.y);
@@ -711,9 +743,11 @@ function Canvas({ language, onClose }) {
     setIsLLMTyping(true);
 
     try {
+      // Filter out hint messages before sending to LLM
+      const messagesForLLM = updatedMessages.filter(msg => msg.sender !== 'hint');
       // Get LLM response
       const llmResponse = await llmService.sendMessage(
-        updatedMessages,
+        messagesForLLM,
         language,
         currentStep
       );
@@ -817,9 +851,11 @@ function Canvas({ language, onClose }) {
         setChatMessages(updatedMessages);
         setIsLLMTyping(true);
         
+        // Filter out hint messages before sending to LLM
+        const messagesForLLM = updatedMessages.filter(msg => msg.sender !== 'hint');
         // Get LLM response
         const llmResponse = await llmService.sendMessage(
-          updatedMessages,
+          messagesForLLM,
           language,
           currentStep
         );
@@ -997,17 +1033,21 @@ function Canvas({ language, onClose }) {
           // Check if we have a colored version of this SVG
           const coloredSvg = coloredSvgsRef.current[index];
           if (coloredSvg && coloredSvg.complete) {
-            // Use the colored version with high-res dimensions
+            // Use the colored version - full opacity (user's work)
+            ctx.globalAlpha = 1.0;
             const highResScale = 4;
             const highResWidth = 655 * highResScale;
             const highResHeight = 493 * highResScale;
             ctx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
           } else {
-            // Use the original SVG
+            // Use the original SVG - 30% opacity (70% transparency)
+            ctx.globalAlpha = 0.3;
             ctx.drawImage(svgImg, x, y, svgWidth, svgHeight);
           }
         }
       });
+      // Reset transparency
+      ctx.globalAlpha = 1.0;
     }
     
     // Draw the current step's SVG from Set 1
@@ -1029,7 +1069,11 @@ function Canvas({ language, onClose }) {
       if (currentStep > 0 && svgImagesSet1[currentSvgIndex] && svgImagesSet1[currentSvgIndex].complete) {
         const x = startX - svgWidth / 2;
         const y = startY - svgHeight / 2;
+        // Set 30% opacity for Set 1 SVG guide (70% transparency)
+        ctx.globalAlpha = 0.3;
         ctx.drawImage(svgImagesSet1[currentSvgIndex], x, y, svgWidth, svgHeight);
+        // Reset transparency
+        ctx.globalAlpha = 1.0;
       }
     }
     
@@ -1108,6 +1152,8 @@ function Canvas({ language, onClose }) {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       
+      // Full opacity for colored version (user's work)
+      ctx.globalAlpha = 1.0;
       ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 
                    x, y, svgWidth, svgHeight);
       
@@ -1140,6 +1186,8 @@ function Canvas({ language, onClose }) {
         
         // If we just filled the bugs SVG (current step is bugs), draw directly from tempCanvas
         if (currentSvgIndex === bugsIndex) {
+          // Full opacity for colored version (user's work)
+          ctx.globalAlpha = 1.0;
           const x = startX - svgWidth / 2;
           const y = startY - svgHeight / 2;
           
@@ -1155,7 +1203,8 @@ function Canvas({ language, onClose }) {
           const coloredBugsSvg = coloredSvgsRef.current[bugsIndex];
           
           if (coloredBugsSvg && coloredBugsSvg.complete) {
-            // Use the colored version
+            // Use the colored version - full opacity (user's work)
+            ctx.globalAlpha = 1.0;
             const x = startX - svgWidth / 2;
             const y = startY - svgHeight / 2;
             
@@ -1167,7 +1216,8 @@ function Canvas({ language, onClose }) {
             // Draw from high-res source to display size
             ctx.drawImage(coloredBugsSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
           } else {
-            // Use the original SVG
+            // Use the original SVG - 30% opacity (70% transparency)
+            ctx.globalAlpha = 0.3;
             const bugsSvg = svgImagesSet2[bugsIndex];
             
             if (bugsSvg && bugsSvg.complete) {
@@ -1177,6 +1227,8 @@ function Canvas({ language, onClose }) {
             }
           }
         }
+        // Reset transparency
+        ctx.globalAlpha = 1.0;
       }
       
       // Redraw brush strokes on the USER canvas (top layer)
@@ -1203,10 +1255,10 @@ function Canvas({ language, onClose }) {
     
     for (let i = canvasTexts.length - 1; i >= 0; i--) {
       const textObj = canvasTexts[i];
-      ctx.font = `${textObj.fontSize || 24}px Avenir, sans-serif`;
+      ctx.font = `${textObj.fontSize || 16}px Avenir, sans-serif`;
       const metrics = ctx.measureText(textObj.text);
       const textWidth = metrics.width;
-      const textHeight = textObj.fontSize || 24;
+      const textHeight = textObj.fontSize || 16;
       
       if (x >= textObj.x && x <= textObj.x + textWidth &&
           y >= textObj.y && y <= textObj.y + textHeight) {
@@ -1297,10 +1349,10 @@ function Canvas({ language, onClose }) {
         // Only allow hovering on temporary text
         if (!textObj.isTemporary) continue;
         
-        ctx.font = `${textObj.fontSize || 24}px Avenir, sans-serif`;
+        ctx.font = `${textObj.fontSize || 16}px Avenir, sans-serif`;
         const metrics = ctx.measureText(textObj.text);
         const textWidth = metrics.width;
-        const textHeight = textObj.fontSize || 24;
+        const textHeight = textObj.fontSize || 16;
         
         if (x >= textObj.x && x <= textObj.x + textWidth &&
             y >= textObj.y && y <= textObj.y + textHeight) {
@@ -1420,7 +1472,7 @@ function Canvas({ language, onClose }) {
         x: canvas.width / 2 - 50 + randomOffsetX,
         y: canvas.height / 2 + randomOffsetY,
         color: '#000000', // Fixed black color for all text labels
-        fontSize: 24,
+        fontSize: 16,
         isTemporary: true // Mark as temporary until user confirms
       };
       
@@ -1491,6 +1543,16 @@ function Canvas({ language, onClose }) {
           image: nextStepData.exampleImage
         };
         messages.push(exampleMessage);
+        
+        // Add hint message after example
+        const exampleHintMessage = {
+          sender: 'hint',
+          text: language === 'EN' 
+            ? 'Feel free to create in your own way—you don\'t need to follow the example strictly.'
+            : '你可以自由发挥创作，不需要严格按照示例来绘画。',
+          timestamp: new Date().toISOString()
+        };
+        messages.push(exampleHintMessage);
       }
       
       setChatMessages(prevMessages => [...prevMessages, ...messages]);
@@ -1534,9 +1596,11 @@ function Canvas({ language, onClose }) {
         setIsLLMTyping(true);
         
         try {
+          // Filter out hint messages before sending to LLM
+          const messagesForLLM = updatedMessages.filter(msg => msg.sender !== 'hint');
           // Get LLM response about the drawing
           const llmResponse = await llmService.sendMessage(
-            updatedMessages,
+            messagesForLLM,
             language,
             currentStep
           );
@@ -1547,7 +1611,16 @@ function Canvas({ language, onClose }) {
             timestamp: new Date().toISOString()
           };
           
-          setChatMessages([...updatedMessages, botMessage]);
+          // Add a hint message after the bot response
+          const hintMessage = {
+            sender: 'hint',
+            text: language === 'EN' 
+              ? 'You can click “Next Step” at any time to end the current stage and enter the next one.'
+              : '你可以随时点击“下一步”，结束当前阶段的探索并进入下一阶段。',
+            timestamp: new Date().toISOString()
+          };
+          
+          setChatMessages([...updatedMessages, botMessage, hintMessage]);
           setIsLLMTyping(false); // Stop typing indicator immediately after message is added
           
           // If speaker is on, play the response as speech (don't block on this)
@@ -1591,40 +1664,112 @@ function Canvas({ language, onClose }) {
           timestamp: new Date().toISOString()
         };
         
-        const instructionMessage = {
-          sender: 'bot',
-          text: language === 'EN'
-            ? `${nextStepData.instructionEN}\n\n${nextStepData.descriptionEN}`
-            : `${nextStepData.instructionCN}\n\n${nextStepData.descriptionCN}`,
-          timestamp: new Date().toISOString()
-        };
-        
-        const messages = [stepTransitionMessage, instructionMessage];
-        
-        if (nextStepData.exampleImage) {
-          const exampleMessage = {
-            sender: 'bot',
-            text: language === 'EN' ? 'Example:' : '示例：',
+        // Check if this is the summary step
+        if (nextStepData.isSummary) {
+          // Summary step: Request LLM to generate closing reflection
+          const canvasDataUrl = getCombinedCanvasDataUrl();
+          
+          const summaryRequestMessage = {
+            sender: 'user',
+            text: language === 'EN' 
+              ? 'I have completed my Tree of Life. '
+              : '我已经完成了我的生命之树。',
             timestamp: new Date().toISOString(),
-            image: nextStepData.exampleImage
+            image: canvasDataUrl
           };
-          messages.push(exampleMessage);
-        }
-        
-        setChatMessages(prevMessages => [...prevMessages, ...messages]);
-        setCurrentStep(currentStep + 1);
-        setHasSubmittedCurrentStep(false);
-        
-        // If speaker is on, play the instruction as speech (don't block on this)
-        if (isSpeakerOn) {
-          // Stop any currently playing audio before playing new instruction
-          ttsService.stop();
-          const instructionText = language === 'EN'
-            ? `${nextStepData.instructionEN}\n\n${nextStepData.descriptionEN}`
-            : `${nextStepData.instructionCN}\n\n${nextStepData.descriptionCN}`;
-          ttsService.playText(instructionText, language).catch(ttsError => {
-            console.error('[Canvas] TTS Error:', ttsError);
-          });
+          
+          const updatedMessages = [...chatMessages, stepTransitionMessage, summaryRequestMessage];
+          setChatMessages(updatedMessages);
+          setCurrentStep(currentStep + 1);
+          setHasSubmittedCurrentStep(true); // Mark as submitted since we're requesting summary
+          setIsLLMTyping(true);
+          
+          try {
+            // Filter out hint messages before sending to LLM
+            const messagesForLLM = updatedMessages.filter(msg => msg.sender !== 'hint');
+            // Get LLM summary response
+            const llmResponse = await llmService.sendMessage(
+              messagesForLLM,
+              language,
+              nextStepIndex // Use the summary step index
+            );
+            
+            const botMessage = {
+              sender: 'bot',
+              text: llmResponse,
+              timestamp: new Date().toISOString()
+            };
+            
+            setChatMessages([...updatedMessages, botMessage]);
+            setIsLLMTyping(false);
+            
+            // If speaker is on, play the response as speech
+            if (isSpeakerOn) {
+              ttsService.stop();
+              ttsService.playText(llmResponse, language).catch(ttsError => {
+                console.error('[Canvas] TTS Error:', ttsError);
+              });
+            }
+          } catch (error) {
+            console.error('Error getting summary from LLM:', error);
+            
+            const errorMessage = {
+              sender: 'bot',
+              text: language === 'EN' 
+                ? "I wasn't able to generate a reflection, but congratulations on completing your Tree of Life! Take a moment to appreciate the tree you've created."
+                : "我无法生成反思，但恭喜你完成了生命之树！花点时间欣赏你创造的这棵树吧。",
+              timestamp: new Date().toISOString()
+            };
+            setChatMessages([...updatedMessages, errorMessage]);
+            setIsLLMTyping(false);
+          }
+        } else {
+          // Regular drawing step
+          const instructionMessage = {
+            sender: 'bot',
+            text: language === 'EN'
+              ? `${nextStepData.instructionEN}\n\n${nextStepData.descriptionEN}`
+              : `${nextStepData.instructionCN}\n\n${nextStepData.descriptionCN}`,
+            timestamp: new Date().toISOString()
+          };
+          
+          const messages = [stepTransitionMessage, instructionMessage];
+          
+          if (nextStepData.exampleImage) {
+            const exampleMessage = {
+              sender: 'bot',
+              text: language === 'EN' ? 'Example:' : '示例：',
+              timestamp: new Date().toISOString(),
+              image: nextStepData.exampleImage
+            };
+            messages.push(exampleMessage);
+            
+            // Add hint message after example
+            const exampleHintMessage = {
+              sender: 'hint',
+              text: language === 'EN' 
+                ? 'Feel free to create in your own way—you don\'t need to follow the example strictly.'
+                : '你可以自由发挥创作，不需要严格按照示例来绘画。',
+              timestamp: new Date().toISOString()
+            };
+            messages.push(exampleHintMessage);
+          }
+          
+          setChatMessages(prevMessages => [...prevMessages, ...messages]);
+          setCurrentStep(currentStep + 1);
+          setHasSubmittedCurrentStep(false);
+          
+          // If speaker is on, play the instruction as speech (don't block on this)
+          if (isSpeakerOn) {
+            // Stop any currently playing audio before playing new instruction
+            ttsService.stop();
+            const instructionText = language === 'EN'
+              ? `${nextStepData.instructionEN}\n\n${nextStepData.descriptionEN}`
+              : `${nextStepData.instructionCN}\n\n${nextStepData.descriptionCN}`;
+            ttsService.playText(instructionText, language).catch(ttsError => {
+              console.error('[Canvas] TTS Error:', ttsError);
+            });
+          }
         }
       } else {
         setIsCompleted(true);
@@ -1896,8 +2041,8 @@ function Canvas({ language, onClose }) {
 
         {/* Right Bottom Buttons - Above Bottom Toolbar */}
         <div className="right-bottom-buttons">
-          {/* Re-edit Button - shown when drawing is submitted */}
-          {hasSubmittedCurrentStep && currentStep > 0 && (
+          {/* Re-edit Button - shown when drawing is submitted (not on summary step) */}
+          {hasSubmittedCurrentStep && currentStep > 0 && !steps[currentStep]?.isSummary && (
             <button 
               type="button"
               className="next-step-btn-floating reedit-btn"
@@ -1947,11 +2092,13 @@ function Canvas({ language, onClose }) {
               onClick={nextStep}
               disabled={isLLMTyping}
             >
-              {isLLMTyping && !hasSubmittedCurrentStep ? (
+              {isLLMTyping ? (
                 <>
                   <span className="spinner"></span>
                   {language === 'EN' ? 'Processing...' : '处理中...'}
                 </>
+              ) : steps[currentStep]?.isSummary ? (
+                language === 'EN' ? 'Complete' : '完成'
               ) : !hasSubmittedCurrentStep ? (
                 language === 'EN' ? 'Submit Drawing' : '提交绘画'
               ) : (
