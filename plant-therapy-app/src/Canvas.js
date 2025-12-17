@@ -64,108 +64,113 @@ function Canvas({ language, onClose }) {
     '#CCCCCC'
   ];
 
-  const steps = useMemo(() => [
-    {
-      stepNumber: 0,
-      titleEN: 'Tree of Life',
-      titleCN: '生命之树',
-      instructionEN: 'Welcome to your Tree of Life journey!',
-      instructionCN: '欢迎来到你的生命之树旅程！',
-      descriptionEN: 'In this activity, we use the metaphor of a tree to explore your life.\n\nImagine yourself as a tree, with roots, a trunk, branches, leaves, flowers or fruits, and even bugs and storms.\n\nOn the screen, you\'ll find a tree template where you can add colors, patterns, or text to different parts of the tree. You can move your text around freely.\n\nClick “Next Step” to start your Tree of Life journey!',
-      descriptionCN: '在这个活动中，我们用树的比喻来探索你的生活。\n\n想象你自己是一棵树，有根、树干、树枝、树叶、花朵或果实，甚至还有虫子和风暴。\n\n在屏幕上，你会找到一个树的模板，你可以在树的不同部分添加颜色、图案或文字。你可以自由移动你的文字。\n\n点击“下一步”，来开启你的生命之树旅程！',
-      exampleImage: null,
-      svgIndex: null
-    },
-    {
-      stepNumber: 1,
-      titleEN: 'ROOT',
-      titleCN: '根',
-      instructionEN: 'The roots represent the foundation of your life.',
-      instructionCN: '根代表你生命的基础。',
-      descriptionEN: 'What has shaped and supported you to get to where you are now?\n\nThink about things like family, home, culture, traditions, or beliefs.',
-      descriptionCN: '是什么塑造并支持你走到今天？\n\n想想家庭、家乡、文化、传统或信仰等事物。',
-      exampleImage: '/canvas/example/01 ROOT.png',
-      svgIndex: 0
-    },
-    {
-      stepNumber: 2,
-      titleEN: 'TRUNK',
-      titleCN: '树干',
-      instructionEN: 'The trunk represents your inner strength and qualities.',
-      instructionCN: '树干代表你的内在力量和品质。',
-      descriptionEN: 'What skills, character traits, or values help you stay strong and move forward?\n\nConsider things like discipline, creativity, bravery, kindness, things that help you overcome obstacles.',
-      descriptionCN: '什么技能、性格特质或价值观帮助你保持坚强并继续前进？\n\n想想纪律、创造力、勇敢、善良等帮助你克服障碍的东西。',
-      exampleImage: '/canvas/example/02 TRUNK.png',
-      svgIndex: 1
-    },
-    {
-      stepNumber: 3,
-      titleEN: 'BRANCHES',
-      titleCN: '树枝',
-      instructionEN: 'The branches reach outward, representing your hopes and goals.',
-      instructionCN: '树枝向外延伸，代表你的希望和目标。',
-      descriptionEN: 'What goals, wishes, or dreams do you have?\n\nMaybe things like building healthy habits, traveling, exploring new hobbies, or forming deeper friendships.',
-      descriptionCN: '你有什么目标、愿望或梦想？\n\n也许是建立健康的习惯、旅行、探索新爱好或建立更深的友谊。',
-      exampleImage: '/canvas/example/03 BRANCH.png',
-      svgIndex: 2
-    },
-    {
-      stepNumber: 4,
-      titleEN: 'LEAVES',
-      titleCN: '树叶',
-      instructionEN: 'The leaves represent the relationships and connections that support you.',
-      instructionCN: '树叶代表支持你的关系和联系。',
-      descriptionEN: 'Who are the people, pets, or mentors who bring you joy and light?\n\nThink of those who make you feel supported and loved.',
-      descriptionCN: '谁是给你带来快乐和光明的人、宠物或导师？\n\n想想那些让你感到被支持和被爱的人。',
-      exampleImage: '/canvas/example/04 LEAVES.png',
-      svgIndex: 3
-    },
-    {
-      stepNumber: 5,
-      titleEN: 'FRUITS/FLOWERS',
-      titleCN: '果实/花朵',
-      instructionEN: 'The fruits and flowers represent the achievements in your life.',
-      instructionCN: '果实和花朵代表你生命中的成就。',
-      descriptionEN: 'What are the accomplishments you\'re most proud of?\n\nIt could be learning a new skill, being there for a friend in need, or creating something meaningful.',
-      descriptionCN: '你最自豪的成就是什么？\n\n可能是学习一项新技能、在朋友需要时陪伴他们，或创造一些有意义的东西。',
-      exampleImage: '/canvas/example/05 FLOWER.png',
-      svgIndex: 4
-    },
-    {
-      stepNumber: 6,
-      titleEN: 'BUGS',
-      titleCN: '虫子',
-      instructionEN: 'The bugs represent the imperfections and worries in life.',
-      instructionCN: '虫子代表生活中的不完美和担忧。',
-      descriptionEN: 'What small things cause you anxiety or unease?\n\nIt might be self-doubt, procrastination, or fear of failure.',
-      descriptionCN: '什么小事让你感到焦虑或不安？\n\n可能是自我怀疑、拖延或对失败的恐惧。',
-      exampleImage: '/canvas/example/06 BUG.png',
-      svgIndex: 5
-    },
-    {
-      stepNumber: 7,
-      titleEN: 'STORMS',
-      titleCN: '风暴',
-      instructionEN: 'The storms represent life\'s challenges and changes.',
-      instructionCN: '风暴代表生活中的挑战和变化。',
-      descriptionEN: 'What challenges or major changes have shaken your life recently?\n\nThink about things like financial stress, balancing work and life, or the loss of a loved one.',
-      descriptionCN: '最近有什么挑战或重大变化动摇了你的生活？\n\n想想财务压力、平衡工作和生活，或失去亲人等事情。',
-      exampleImage: '/canvas/example/07 STORM.png',
-      svgIndex: 6
-    },
-    {
-      stepNumber: 8,
-      titleEN: 'REFLECTION',
-      titleCN: '回顾总结',
-      instructionEN: 'Let\'s reflect on your complete Tree of Life.',
-      instructionCN: '让我们回顾你完整的生命之树。',
-      descriptionEN: 'You have completed all parts of your Tree of Life. Now let\'s take a moment to see your tree as a whole and reflect on this journey.',
-      descriptionCN: '你已经完成了生命之树的所有部分。现在让我们花点时间来看看你完整的树，并回顾这段旅程。',
-      exampleImage: null,
-      svgIndex: null,
-      isSummary: true
-    }
-  ], []);
+  const steps = useMemo(() => {
+    // Determine example image folder based on language
+    const exampleFolder = language === 'EN' ? 'English' : 'Chinese';
+    
+    return [
+      {
+        stepNumber: 0,
+        titleEN: 'Tree of Life',
+        titleCN: '生命之树',
+        instructionEN: 'Welcome to your Tree of Life journey!',
+        instructionCN: '欢迎来到你的生命之树旅程！',
+        descriptionEN: 'In this activity, we use the metaphor of a tree to explore your life.\n\nImagine yourself as a tree, with roots, a trunk, branches, leaves, flowers or fruits, and even bugs and storms.\n\nOn the screen, you\'ll find a tree template where you can add colors, patterns, or text to different parts of the tree. You can move your text around freely.\n\nClick "Next Step" to start your Tree of Life journey!',
+        descriptionCN: '在这个活动中，我们用树的比喻来探索你的生活。\n\n想象你自己是一棵树，有根、树干、树枝、树叶、花朵或果实，甚至还有虫子和风暴。\n\n在屏幕上，你会找到一个树的模板，你可以在树的不同部分添加颜色、图案或文字。你可以自由移动你的文字。\n\n点击"下一步"，来开启你的生命之树旅程！',
+        exampleImage: null,
+        svgIndex: null
+      },
+      {
+        stepNumber: 1,
+        titleEN: 'ROOT',
+        titleCN: '根',
+        instructionEN: 'The roots represent the foundation of your life.',
+        instructionCN: '根代表你生命的基础。',
+        descriptionEN: 'What has shaped and supported you to get to where you are now?\n\nThink about things like family, home, culture, traditions, or beliefs.',
+        descriptionCN: '是什么塑造并支持你走到今天？\n\n想想家庭、家乡、文化、传统或信仰等事物。',
+        exampleImage: `/canvas/example/${exampleFolder}/01 ROOT eg.png`,
+        svgIndex: 0
+      },
+      {
+        stepNumber: 2,
+        titleEN: 'TRUNK',
+        titleCN: '树干',
+        instructionEN: 'The trunk represents your inner strength and qualities.',
+        instructionCN: '树干代表你的内在力量和品质。',
+        descriptionEN: 'What skills, character traits, or values help you stay strong and move forward?\n\nConsider things like discipline, creativity, bravery, kindness, things that help you overcome obstacles.',
+        descriptionCN: '什么技能、性格特质或价值观帮助你保持坚强并继续前进？\n\n想想纪律、创造力、勇敢、善良等帮助你克服障碍的东西。',
+        exampleImage: `/canvas/example/${exampleFolder}/02 TRUNK eg.png`,
+        svgIndex: 1
+      },
+      {
+        stepNumber: 3,
+        titleEN: 'BRANCHES',
+        titleCN: '树枝',
+        instructionEN: 'The branches reach outward, representing your hopes and goals.',
+        instructionCN: '树枝向外延伸，代表你的希望和目标。',
+        descriptionEN: 'What goals, wishes, or dreams do you have?\n\nMaybe things like building healthy habits, traveling, exploring new hobbies, or forming deeper friendships.',
+        descriptionCN: '你有什么目标、愿望或梦想？\n\n也许是建立健康的习惯、旅行、探索新爱好或建立更深的友谊。',
+        exampleImage: `/canvas/example/${exampleFolder}/03 BRANCH eg.png`,
+        svgIndex: 2
+      },
+      {
+        stepNumber: 4,
+        titleEN: 'LEAVES',
+        titleCN: '树叶',
+        instructionEN: 'The leaves represent the relationships and connections that support you.',
+        instructionCN: '树叶代表支持你的关系和联系。',
+        descriptionEN: 'Who are the people, pets, or mentors who bring you joy and light?\n\nThink of those who make you feel supported and loved.',
+        descriptionCN: '谁是给你带来快乐和光明的人、宠物或导师？\n\n想想那些让你感到被支持和被爱的人。',
+        exampleImage: `/canvas/example/${exampleFolder}/04 LEAVES eg.png`,
+        svgIndex: 3
+      },
+      {
+        stepNumber: 5,
+        titleEN: 'FRUITS/FLOWERS',
+        titleCN: '果实/花朵',
+        instructionEN: 'The fruits and flowers represent the achievements in your life.',
+        instructionCN: '果实和花朵代表你生命中的成就。',
+        descriptionEN: 'What are the accomplishments you\'re most proud of?\n\nIt could be learning a new skill, being there for a friend in need, or creating something meaningful.',
+        descriptionCN: '你最自豪的成就是什么？\n\n可能是学习一项新技能、在朋友需要时陪伴他们，或创造一些有意义的东西。',
+        exampleImage: `/canvas/example/${exampleFolder}/05 FLOWER eg.png`,
+        svgIndex: 4
+      },
+      {
+        stepNumber: 6,
+        titleEN: 'BUGS',
+        titleCN: '虫子',
+        instructionEN: 'The bugs represent the imperfections and worries in life.',
+        instructionCN: '虫子代表生活中的不完美和担忧。',
+        descriptionEN: 'What small things cause you anxiety or unease?\n\nIt might be self-doubt, procrastination, or fear of failure.',
+        descriptionCN: '什么小事让你感到焦虑或不安？\n\n可能是自我怀疑、拖延或对失败的恐惧。',
+        exampleImage: `/canvas/example/${exampleFolder}/06 BUG eg.png`,
+        svgIndex: 5
+      },
+      {
+        stepNumber: 7,
+        titleEN: 'STORMS',
+        titleCN: '风暴',
+        instructionEN: 'The storms represent life\'s challenges and changes.',
+        instructionCN: '风暴代表生活中的挑战和变化。',
+        descriptionEN: 'What challenges or major changes have shaken your life recently?\n\nThink about things like financial stress, balancing work and life, or the loss of a loved one.',
+        descriptionCN: '最近有什么挑战或重大变化动摇了你的生活？\n\n想想财务压力、平衡工作和生活，或失去亲人等事情。',
+        exampleImage: `/canvas/example/${exampleFolder}/07 STORM eg.png`,
+        svgIndex: 6
+      },
+      {
+        stepNumber: 8,
+        titleEN: 'REFLECTION',
+        titleCN: '回顾总结',
+        instructionEN: 'Let\'s reflect on your complete Tree of Life.',
+        instructionCN: '让我们回顾你完整的生命之树。',
+        descriptionEN: 'You have completed all parts of your Tree of Life. Now let\'s take a moment to see your tree as a whole and reflect on this journey.',
+        descriptionCN: '你已经完成了生命之树的所有部分。现在让我们花点时间来看看你完整的树，并回顾这段旅程。',
+        exampleImage: null,
+        svgIndex: null,
+        isSummary: true
+      }
+    ];
+  }, [language]);
 
   // Store loaded SVG images in refs so they persist across re-renders
   const svgImagesSet1Ref = useRef([]);
@@ -210,16 +215,40 @@ function Canvas({ language, onClose }) {
       // Top layer is transparent (user drawing layer)
       ctx.clearRect(0, 0, rect.width, rect.height);
       
-      // Define SVG filenames shared by both sets
-      const svgFiles = [
-        'Chatbot 02 (ROOT)-01.svg',
-        'Chatbot 03 (TRUNK)_画板 6.svg',
-        'Chatbot 04 (BRANCH)_画板 7.svg',
-        'Chatbot 05 (LEAVES)_画板 9.svg',
-        'Chatbot 06 (FLOWER)_画板 9.svg',
-        'Chatbot 07 (BUG)_画板 10.svg',
-        'Chatbot 08 (STORM)_画板 11.svg'
+      // Define SVG filenames for Set 2 (always English version in canvas/2)
+      const svgFilesSet2 = [
+        'fill (ROOT).svg',
+        'fill (TRUNK).svg',
+        'fill (BRANCH).svg',
+        'fill (LEAVES).svg',
+        'fill (FLOWER).svg',
+        'fill (BUG).svg',
+        'fill (STORM).svg'
       ];
+      
+      // Define SVG filenames for Set 1 (language-specific in canvas/1)
+      const svgFilesSet1EN = [
+        '01 ROOT.svg',
+        '02 TRUNK.svg',
+        '03 BRANCH.svg',
+        '04 LEAVES.svg',
+        '05 FLOWER.svg',
+        '06 BUG.svg',
+        '07 STORM.svg'
+      ];
+      
+      const svgFilesSet1CN = [
+        '01 ROOT.svg',
+        '02 TRUNK.svg',
+        '03 BRUNCH.svg',
+        '04 LEAF.svg',
+        '05 FLOWER.svg',
+        '06 BUG.svg',
+        '07 STORM.svg'
+      ];
+      
+      // Select the appropriate file list based on language
+      const svgFilesSet1 = language === 'EN' ? svgFilesSet1EN : svgFilesSet1CN;
       
       // Calculate position: center slightly to the left (using display size, not canvas size)
       const displayWidth = rect.width;
@@ -255,7 +284,7 @@ function Canvas({ language, onClose }) {
         // Ensure all set 2 images are loaded
         const allLoadedSet2 = svgImagesSet2.every((img) => img && img.complete);
         
-        if (allLoadedSet2 && loadedCountSet2 === svgFiles.length) {
+        if (allLoadedSet2 && loadedCountSet2 === svgFilesSet2.length) {
           // Draw all set 2 SVGs on the BASE canvas (non-erasable layer)
           const scale = 1.2; // Scale factor to make SVGs larger (2x = double size)
           
@@ -287,7 +316,7 @@ function Canvas({ language, onClose }) {
               const y = startY - svgHeight / 2;
               
               // Set 30% opacity for Set 2 SVGs (70% transparency)
-              baseCtx.globalAlpha = 0.3;
+              baseCtx.globalAlpha = 1.0;
               // Draw the SVG image with scaled size while maintaining aspect ratio
               baseCtx.drawImage(svgImg, x, y, svgWidth, svgHeight);
             }
@@ -302,15 +331,14 @@ function Canvas({ language, onClose }) {
         }
       };
       
-      // Preload set 1 (for step-by-step reveal)
-      // Note: If Chinese SVGs are not available, fallback to English
-      const languageFolder = language === 'EN' ? 'English' : 'English'; // TODO: Change to 'Chinese' when Chinese SVGs are available
-      svgFiles.forEach((svgFile, index) => {
+      // Preload set 1 (for step-by-step reveal) - language specific
+      const languageFolder = language === 'EN' ? 'English' : 'Chinese';
+      svgFilesSet1.forEach((svgFile, index) => {
         const imgSet1 = new Image();
         imgSet1.onload = () => {
           svgImagesSet1[index] = imgSet1;
           loadedCountSet1++;
-          if (loadedCountSet1 === svgFiles.length) {
+          if (loadedCountSet1 === svgFilesSet1.length) {
             svgImagesSet1Ref.current = svgImagesSet1;
             svgsLoadedRef.current = true;
           }
@@ -322,13 +350,13 @@ function Canvas({ language, onClose }) {
         imgSet1.src = `/canvas/1/${languageFolder}/${encodeURIComponent(svgFile)}`;
       });
       
-      // Load and draw set 2
-      svgFiles.forEach((svgFile, index) => {
+      // Load and draw set 2 (always uses English filenames from canvas/2)
+      svgFilesSet2.forEach((svgFile, index) => {
         const imgSet2 = new Image();
         imgSet2.onload = () => {
           svgImagesSet2[index] = imgSet2;
           loadedCountSet2++;
-          if (loadedCountSet2 === svgFiles.length) {
+          if (loadedCountSet2 === svgFilesSet2.length) {
             svgImagesSet2Ref.current = svgImagesSet2;
           }
           drawSet2SVGs();
@@ -336,7 +364,7 @@ function Canvas({ language, onClose }) {
         imgSet2.onerror = (error) => {
           console.error(`Error loading SVG from set 2: ${svgFile}`, error);
           loadedCountSet2++;
-          if (loadedCountSet2 === svgFiles.length) {
+          if (loadedCountSet2 === svgFilesSet2.length) {
             drawSet2SVGs();
           }
         };
@@ -481,7 +509,7 @@ function Canvas({ language, onClose }) {
             tempCtx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
           } else {
             // Use the original SVG - 30% opacity (70% transparency)
-            tempCtx.globalAlpha = 0.3;
+            tempCtx.globalAlpha = 1.0;
             tempCtx.drawImage(svgImg, x, y, svgWidth, svgHeight);
           }
         }
@@ -499,7 +527,7 @@ function Canvas({ language, onClose }) {
         const y = startY - svgHeight / 2;
         
         // Set 30% opacity for Set 1 SVG guide (70% transparency)
-        tempCtx.globalAlpha = 0.3;
+        tempCtx.globalAlpha = 1.0;
         // Draw the specific SVG for this step from Set 1
         tempCtx.drawImage(svgImg, x, y, svgWidth, svgHeight);
         // Reset transparency
@@ -531,7 +559,7 @@ function Canvas({ language, onClose }) {
         tempCtx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
       } else {
         // Use the original SVG - 30% opacity (70% transparency)
-        tempCtx.globalAlpha = 0.3;
+        tempCtx.globalAlpha = 1.0;
         const svgImg = svgImagesSet2[currentSvgIndex];
         
         if (svgImg && svgImg.complete) {
@@ -568,7 +596,7 @@ function Canvas({ language, onClose }) {
         tempCtx.drawImage(coloredBugsSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
       } else {
         // Use the original SVG - 30% opacity (70% transparency)
-        tempCtx.globalAlpha = 0.3;
+        tempCtx.globalAlpha = 1.0;
         const bugsSvg = svgImagesSet2[bugsIndex];
         
         if (bugsSvg && bugsSvg.complete) {
@@ -1051,7 +1079,7 @@ function Canvas({ language, onClose }) {
             ctx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
           } else {
             // Use the original SVG - 30% opacity (70% transparency)
-            ctx.globalAlpha = 0.3;
+            ctx.globalAlpha = 1.0;
             ctx.drawImage(svgImg, x, y, svgWidth, svgHeight);
           }
         }
@@ -1080,7 +1108,7 @@ function Canvas({ language, onClose }) {
         const x = startX - svgWidth / 2;
         const y = startY - svgHeight / 2;
         // Set 30% opacity for Set 1 SVG guide (70% transparency)
-        ctx.globalAlpha = 0.3;
+        ctx.globalAlpha = 1.0;
         ctx.drawImage(svgImagesSet1[currentSvgIndex], x, y, svgWidth, svgHeight);
         // Reset transparency
         ctx.globalAlpha = 1.0;
@@ -1227,7 +1255,7 @@ function Canvas({ language, onClose }) {
             ctx.drawImage(coloredBugsSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
           } else {
             // Use the original SVG - 30% opacity (70% transparency)
-            ctx.globalAlpha = 0.3;
+            ctx.globalAlpha = 1.0;
             const bugsSvg = svgImagesSet2[bugsIndex];
             
             if (bugsSvg && bugsSvg.complete) {
