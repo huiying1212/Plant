@@ -42,6 +42,8 @@ function Canvas({ language, onClose }) {
   const [currentStroke, setCurrentStroke] = useState(null); // Track current stroke being drawn
   const [history, setHistory] = useState([]);
   const [historyStep, setHistoryStep] = useState(0);
+  const [redrawTrigger, setRedrawTrigger] = useState(0); // Trigger for baseCanvas redraw on undo/redo
+  const [isUndoRedoInProgress, setIsUndoRedoInProgress] = useState(false); // Prevent rapid undo/redo clicks
   const [isCompleted, setIsCompleted] = useState(false);
   const [rating, setRating] = useState(null);
   const [hasSubmittedCurrentStep, setHasSubmittedCurrentStep] = useState(false);
@@ -184,36 +186,50 @@ function Canvas({ language, onClose }) {
   // Use ref to track if initial SVGs are drawn to avoid dependency issues
   const initialDrawnRef = useRef(false);
 
+  // Store canvas dimensions for consistent sizing
+  const canvasDimensionsRef = useRef({ width: 0, height: 0 });
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const baseCanvas = baseCanvasRef.current;
     if (canvas && baseCanvas) {
-      // Initial setup with high DPI support for both canvases
+      // Get the container dimensions
+      const container = canvas.parentElement;
+      const containerRect = container.getBoundingClientRect();
+      
+      // Use a fixed internal resolution based on initial container size
+      // This prevents the canvas from being affected by browser zoom
+      const fixedDpr = 1; // Use fixed DPR of 1 to avoid zoom issues
+      const displayWidth = containerRect.width;
+      const displayHeight = containerRect.height;
+      
+      // Store dimensions for resize handling
+      canvasDimensionsRef.current = { width: displayWidth, height: displayHeight };
+      
+      // Initial setup with fixed resolution for both canvases
       const ctx = canvas.getContext('2d');
       const baseCtx = baseCanvas.getContext('2d');
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
       
-      // Set canvas size accounting for device pixel ratio - TOP LAYER (user drawing)
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
+      // Set canvas size with fixed DPR - TOP LAYER (user drawing)
+      canvas.width = displayWidth * fixedDpr;
+      canvas.height = displayHeight * fixedDpr;
+      ctx.scale(fixedDpr, fixedDpr);
+      canvas.style.width = `${displayWidth}px`;
+      canvas.style.height = `${displayHeight}px`;
       
-      // Set canvas size accounting for device pixel ratio - BASE LAYER (SVG template)
-      baseCanvas.width = rect.width * dpr;
-      baseCanvas.height = rect.height * dpr;
-      baseCtx.scale(dpr, dpr);
-      baseCanvas.style.width = `${rect.width}px`;
-      baseCanvas.style.height = `${rect.height}px`;
+      // Set canvas size with fixed DPR - BASE LAYER (SVG template)
+      baseCanvas.width = displayWidth * fixedDpr;
+      baseCanvas.height = displayHeight * fixedDpr;
+      baseCtx.scale(fixedDpr, fixedDpr);
+      baseCanvas.style.width = `${displayWidth}px`;
+      baseCanvas.style.height = `${displayHeight}px`;
       
       // Fill base canvas with background color (SVG layer)
       baseCtx.fillStyle = '#F5F5F5';
-      baseCtx.fillRect(0, 0, rect.width, rect.height);
+      baseCtx.fillRect(0, 0, displayWidth, displayHeight);
       
       // Top layer is transparent (user drawing layer)
-      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.clearRect(0, 0, displayWidth, displayHeight);
       
       // Define SVG filenames for Set 2 (always English version in canvas/2)
       const svgFilesSet2 = [
@@ -251,8 +267,7 @@ function Canvas({ language, onClose }) {
       const svgFilesSet1 = language === 'EN' ? svgFilesSet1EN : svgFilesSet1CN;
       
       // Calculate position: center slightly to the left (using display size, not canvas size)
-      const displayWidth = rect.width;
-      const displayHeight = rect.height;
+      // displayWidth and displayHeight are already defined above
       const centerX = displayWidth / 2;
       const centerY = displayHeight / 2;
       const offsetX = -150; // Offset to the left (negative = left)
@@ -371,59 +386,71 @@ function Canvas({ language, onClose }) {
         imgSet2.src = `/canvas/2/${encodeURIComponent(svgFile)}`;
       });
       
-      // Handle resize - preserve existing content for both canvases
-      const resizeCanvas = () => {
-        const currentBaseImage = baseCanvas.toDataURL();
-        const currentUserImage = canvas.toDataURL();
+      // Handle resize - maintain fixed canvas size to prevent zoom/resize issues
+      // Instead of resizing the canvas, we keep it at the initial fixed size
+      // This prevents content from being affected by browser zoom or window resize
+      const handleResize = () => {
+        const container = canvas.parentElement;
+        const containerRect = container.getBoundingClientRect();
+        const newWidth = containerRect.width;
+        const newHeight = containerRect.height;
         
-        const baseImg = new Image();
-        const userImg = new Image();
-        let loadedCount = 0;
+        // Only update if dimensions actually changed
+        const oldDims = canvasDimensionsRef.current;
+        if (Math.abs(newWidth - oldDims.width) < 1 && Math.abs(newHeight - oldDims.height) < 1) {
+          return; // No significant change
+        }
         
-        const onBothLoaded = () => {
-          loadedCount++;
-          if (loadedCount < 2) return;
-          
-          const dpr = window.devicePixelRatio || 1;
-          const newRect = canvas.getBoundingClientRect();
-          const oldWidth = canvas.width / dpr;
-          const oldHeight = canvas.height / dpr;
-          
-          // Resize base canvas
-          baseCanvas.width = newRect.width * dpr;
-          baseCanvas.height = newRect.height * dpr;
-          const newBaseCtx = baseCanvas.getContext('2d');
-          newBaseCtx.scale(dpr, dpr);
-          baseCanvas.style.width = `${newRect.width}px`;
-          baseCanvas.style.height = `${newRect.height}px`;
-          newBaseCtx.fillStyle = '#F5F5F5';
-          newBaseCtx.fillRect(0, 0, newRect.width, newRect.height);
-          newBaseCtx.drawImage(baseImg, 0, 0, oldWidth, oldHeight, 0, 0, oldWidth, oldHeight);
-          
-          // Resize user canvas
-          canvas.width = newRect.width * dpr;
-          canvas.height = newRect.height * dpr;
-          const newCtx = canvas.getContext('2d');
-          newCtx.scale(dpr, dpr);
-          canvas.style.width = `${newRect.width}px`;
-          canvas.style.height = `${newRect.height}px`;
-          newCtx.clearRect(0, 0, newRect.width, newRect.height);
-          newCtx.drawImage(userImg, 0, 0, oldWidth, oldHeight, 0, 0, oldWidth, oldHeight);
-          
-          // Save to history after resize
-          saveCanvasState();
-        };
+        // Store brush strokes data for redrawing (they're stored in state, so we just redraw)
+        const fixedDpr = 1;
         
-        baseImg.onload = onBothLoaded;
-        userImg.onload = onBothLoaded;
-        baseImg.src = currentBaseImage;
-        userImg.src = currentUserImage;
+        // Update stored dimensions
+        canvasDimensionsRef.current = { width: newWidth, height: newHeight };
+        
+        // Resize base canvas
+        baseCanvas.width = newWidth * fixedDpr;
+        baseCanvas.height = newHeight * fixedDpr;
+        const newBaseCtx = baseCanvas.getContext('2d');
+        newBaseCtx.scale(fixedDpr, fixedDpr);
+        baseCanvas.style.width = `${newWidth}px`;
+        baseCanvas.style.height = `${newHeight}px`;
+        
+        // Resize user canvas
+        canvas.width = newWidth * fixedDpr;
+        canvas.height = newHeight * fixedDpr;
+        const newCtx = canvas.getContext('2d');
+        newCtx.scale(fixedDpr, fixedDpr);
+        canvas.style.width = `${newWidth}px`;
+        canvas.style.height = `${newHeight}px`;
+        
+        // Trigger a complete redraw of SVGs by updating redrawTrigger
+        // The useEffect watching currentStep will handle redrawing everything
+        setRedrawTrigger(prev => prev + 1);
       };
       
-      window.addEventListener('resize', resizeCanvas);
+      // Debounce resize handler to avoid excessive redraws
+      let resizeTimeout;
+      const debouncedResize = () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(handleResize, 100);
+      };
+      
+      window.addEventListener('resize', debouncedResize);
+      
+      // Also listen for devicePixelRatio changes (browser zoom)
+      // Using matchMedia to detect zoom changes
+      const mediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+      const handleZoomChange = () => {
+        // When zoom changes, just trigger a redraw with current dimensions
+        // The fixed DPR approach means we don't need to recalculate canvas size
+        setRedrawTrigger(prev => prev + 1);
+      };
+      mediaQuery.addEventListener('change', handleZoomChange);
       
       return () => {
-        window.removeEventListener('resize', resizeCanvas);
+        window.removeEventListener('resize', debouncedResize);
+        mediaQuery.removeEventListener('change', handleZoomChange);
+        clearTimeout(resizeTimeout);
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -438,21 +465,21 @@ function Canvas({ language, onClose }) {
     if (!canvas || !baseCanvas) return;
     
     const baseCtx = baseCanvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
+    const fixedDpr = 1; // Use fixed DPR to avoid browser zoom issues
     
     // Reset globalAlpha to ensure SVGs are drawn with full opacity
     baseCtx.globalAlpha = 1;
     
-    // Get display dimensions
-    const displayWidth = baseCanvas.width / dpr;
-    const displayHeight = baseCanvas.height / dpr;
+    // Get display dimensions from the actual canvas style (more reliable than canvas.width/dpr)
+    const displayWidth = parseFloat(baseCanvas.style.width) || baseCanvas.width / fixedDpr;
+    const displayHeight = parseFloat(baseCanvas.style.height) || baseCanvas.height / fixedDpr;
     
     // Create a temporary high-resolution canvas for drawing SVGs
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = baseCanvas.width;  // Use full physical pixel width
     tempCanvas.height = baseCanvas.height; // Use full physical pixel height
     const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.scale(dpr, dpr); // Scale the context to work in display coordinates
+    tempCtx.scale(fixedDpr, fixedDpr); // Scale the context to work in display coordinates
     
     // Draw the background on temp canvas
     tempCtx.fillStyle = '#F5F5F5';
@@ -623,10 +650,18 @@ function Canvas({ language, onClose }) {
     ctx.clearRect(0, 0, displayWidth, displayHeight);
     redrawBrushStrokes(ctx);
     
-    // Save combined state to history
-    saveCanvasState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStep, steps]);
+  }, [currentStep, steps, redrawTrigger]);
+
+  // Save state only when step changes (not on undo/redo redraws)
+  const prevStepRef = useRef(currentStep);
+  useEffect(() => {
+    if (prevStepRef.current !== currentStep) {
+      saveCanvasState();
+      prevStepRef.current = currentStep;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
 
   // Initialize chat messages with first step guidance
   useEffect(() => {
@@ -700,9 +735,9 @@ function Canvas({ language, onClose }) {
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    const displayWidth = canvas.width / dpr;
-    const displayHeight = canvas.height / dpr;
+    const fixedDpr = 1; // Use fixed DPR to avoid browser zoom issues
+    const displayWidth = parseFloat(canvas.style.width) || canvas.width / fixedDpr;
+    const displayHeight = parseFloat(canvas.style.height) || canvas.height / fixedDpr;
     
     // Clear the user canvas and redraw brush strokes
     ctx.clearRect(0, 0, displayWidth, displayHeight);
@@ -717,27 +752,27 @@ function Canvas({ language, onClose }) {
     });
   };
 
-  // Redraw texts when canvasTexts changes or when dragging
+  // Redraw user canvas when brushStrokes, canvasTexts, or historyStep changes
   useEffect(() => {
     redrawCanvasWithTexts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasTexts, historyStep]);
+  }, [brushStrokes, canvasTexts, historyStep]);
 
   // Get combined canvas image (base + user layers) as data URL
   const getCombinedCanvasDataUrl = () => {
     const canvas = canvasRef.current;
     const baseCanvas = baseCanvasRef.current;
     if (canvas && baseCanvas) {
-      const dpr = window.devicePixelRatio || 1;
-      const displayWidth = canvas.width / dpr;
-      const displayHeight = canvas.height / dpr;
+      const fixedDpr = 1; // Use fixed DPR to avoid browser zoom issues
+      const displayWidth = parseFloat(canvas.style.width) || canvas.width / fixedDpr;
+      const displayHeight = parseFloat(canvas.style.height) || canvas.height / fixedDpr;
       
       // Create a temporary canvas to combine both layers
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = canvas.width;
       tempCanvas.height = canvas.height;
       const tempCtx = tempCanvas.getContext('2d');
-      tempCtx.scale(dpr, dpr);
+      tempCtx.scale(fixedDpr, fixedDpr);
       
       // Draw base layer first (SVG template)
       tempCtx.drawImage(baseCanvas, 0, 0, displayWidth, displayHeight);
@@ -749,19 +784,86 @@ function Canvas({ language, onClose }) {
     return null;
   };
 
+  // Save colored SVGs state as data URLs for undo/redo
+  const getColoredSvgsState = () => {
+    const coloredSvgsState = {};
+    Object.keys(coloredSvgsRef.current).forEach(key => {
+      const img = coloredSvgsRef.current[key];
+      if (img && img.src) {
+        coloredSvgsState[key] = img.src;
+      }
+    });
+    return coloredSvgsState;
+  };
+
+  // Restore colored SVGs from saved state (returns Promise that resolves when all images are loaded)
+  const restoreColoredSvgs = (coloredSvgsState) => {
+    return new Promise((resolve) => {
+      // Clear current colored SVGs
+      coloredSvgsRef.current = {};
+      
+      if (coloredSvgsState && Object.keys(coloredSvgsState).length > 0) {
+        const keys = Object.keys(coloredSvgsState);
+        let loadedCount = 0;
+        const totalToLoad = keys.filter(key => coloredSvgsState[key]).length;
+        
+        if (totalToLoad === 0) {
+          resolve();
+          return;
+        }
+        
+        keys.forEach(key => {
+          const dataUrl = coloredSvgsState[key];
+          if (dataUrl) {
+            const img = new Image();
+            img.onload = () => {
+              loadedCount++;
+              if (loadedCount === totalToLoad) {
+                resolve();
+              }
+            };
+            img.onerror = () => {
+              loadedCount++;
+              if (loadedCount === totalToLoad) {
+                resolve();
+              }
+            };
+            img.src = dataUrl;
+            coloredSvgsRef.current[key] = img;
+          }
+        });
+      } else {
+        resolve();
+      }
+    });
+  };
+
   // Save combined canvas state (base + user layers) to history
-  const saveCanvasState = () => {
+  // Accepts optional overrides for state that was just updated (since React state updates are async)
+  const saveCanvasState = (options = {}) => {
+    const {
+      newBrushStrokes = brushStrokes,
+      newCanvasTexts = canvasTexts
+    } = options;
+    
     const dataUrl = getCombinedCanvasDataUrl();
     if (dataUrl) {
+      // Store complete state for proper undo/redo (including colored SVGs)
+      const state = {
+        dataUrl,
+        brushStrokes: [...newBrushStrokes],
+        canvasTexts: [...newCanvasTexts],
+        coloredSvgs: getColoredSvgsState(),
+      };
       const newHistory = history.slice(0, historyStep + 1);
-      newHistory.push(dataUrl);
+      newHistory.push(state);
       setHistory(newHistory);
       setHistoryStep(newHistory.length - 1);
     }
   };
 
-  const saveToHistory = () => {
-    saveCanvasState();
+  const saveToHistory = (options = {}) => {
+    saveCanvasState(options);
   };
 
   // Send message to LLM
@@ -983,17 +1085,51 @@ function Canvas({ language, onClose }) {
     }
   };
 
-  const undo = () => {
-    if (historyStep > 0) {
-      setHistoryStep(historyStep - 1);
-      // The useEffect watching historyStep will handle redrawing
+  const undo = async () => {
+    // Prevent rapid clicks while undo is in progress
+    if (isUndoRedoInProgress || historyStep <= 0) return;
+    
+    setIsUndoRedoInProgress(true);
+    try {
+      const newStep = historyStep - 1;
+      const state = history[newStep];
+      if (state && state.brushStrokes !== undefined) {
+        setBrushStrokes(state.brushStrokes);
+        setCanvasTexts(state.canvasTexts || []);
+        // Restore colored SVGs for fill undo - wait for images to load
+        if (state.coloredSvgs) {
+          await restoreColoredSvgs(state.coloredSvgs);
+        }
+        // Always trigger baseCanvas redraw to ensure canvas updates
+        setRedrawTrigger(prev => prev + 1);
+      }
+      setHistoryStep(newStep);
+    } finally {
+      setIsUndoRedoInProgress(false);
     }
   };
 
-  const redo = () => {
-    if (historyStep < history.length - 1) {
-      setHistoryStep(historyStep + 1);
-      // The useEffect watching historyStep will handle redrawing
+  const redo = async () => {
+    // Prevent rapid clicks while redo is in progress
+    if (isUndoRedoInProgress || historyStep >= history.length - 1) return;
+    
+    setIsUndoRedoInProgress(true);
+    try {
+      const newStep = historyStep + 1;
+      const state = history[newStep];
+      if (state && state.brushStrokes !== undefined) {
+        setBrushStrokes(state.brushStrokes);
+        setCanvasTexts(state.canvasTexts || []);
+        // Restore colored SVGs for fill redo - wait for images to load
+        if (state.coloredSvgs) {
+          await restoreColoredSvgs(state.coloredSvgs);
+        }
+        // Always trigger baseCanvas redraw to ensure canvas updates
+        setRedrawTrigger(prev => prev + 1);
+      }
+      setHistoryStep(newStep);
+    } finally {
+      setIsUndoRedoInProgress(false);
     }
   };
 
@@ -1006,9 +1142,9 @@ function Canvas({ language, onClose }) {
     if (!baseCanvas) return;
     
     const ctx = baseCanvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    const displayWidth = baseCanvas.width / dpr;
-    const displayHeight = baseCanvas.height / dpr;
+    const fixedDpr = 1; // Use fixed DPR to avoid browser zoom issues
+    const displayWidth = parseFloat(baseCanvas.style.width) || baseCanvas.width / fixedDpr;
+    const displayHeight = parseFloat(baseCanvas.style.height) || baseCanvas.height / fixedDpr;
     
     // Reset globalAlpha to ensure SVGs are drawn with full opacity
     ctx.globalAlpha = 1;
@@ -1428,9 +1564,11 @@ function Canvas({ language, onClose }) {
     if (isDrawing) {
       setIsDrawing(false);
       
-      // Save the completed stroke
+      // Save the completed stroke and get the new strokes array
+      let newBrushStrokes = brushStrokes;
       if (currentStroke && currentStroke.points.length > 0) {
-        setBrushStrokes([...brushStrokes, currentStroke]);
+        newBrushStrokes = [...brushStrokes, currentStroke];
+        setBrushStrokes(newBrushStrokes);
         setCurrentStroke(null);
       }
       
@@ -1442,7 +1580,8 @@ function Canvas({ language, onClose }) {
         ctx.globalCompositeOperation = 'source-over'; // Reset to normal drawing mode
       }
       
-      saveToHistory();
+      // Pass the new strokes to saveToHistory since React state update is async
+      saveToHistory({ newBrushStrokes });
     }
   };
 
@@ -1561,7 +1700,8 @@ function Canvas({ language, onClose }) {
       setCanvasTexts(newTexts);
       setTempTextIndex(null);
       setCurrentTool('pen'); // Reset tool to pen after confirming text
-      saveToHistory();
+      // Pass the new texts to saveToHistory since React state update is async
+      saveToHistory({ newCanvasTexts: newTexts });
     }
   };
 
@@ -1923,7 +2063,7 @@ function Canvas({ language, onClose }) {
             <button className="toolbar-btn" onClick={undo} disabled={historyStep === 0}>
               <img src="/element/undo.svg" alt="Undo" />
             </button>
-            <button className="toolbar-btn" onClick={redo} disabled={historyStep === history.length - 1}>
+            <button className="toolbar-btn" onClick={redo} disabled={history.length === 0 || historyStep >= history.length - 1}>
               <img src="/element/redo.svg" alt="Redo" />
             </button>
           </div>
