@@ -386,71 +386,12 @@ function Canvas({ language, onClose }) {
         imgSet2.src = `/canvas/2/${encodeURIComponent(svgFile)}`;
       });
       
-      // Handle resize - maintain fixed canvas size to prevent zoom/resize issues
-      // Instead of resizing the canvas, we keep it at the initial fixed size
-      // This prevents content from being affected by browser zoom or window resize
-      const handleResize = () => {
-        const container = canvas.parentElement;
-        const containerRect = container.getBoundingClientRect();
-        const newWidth = containerRect.width;
-        const newHeight = containerRect.height;
-        
-        // Only update if dimensions actually changed
-        const oldDims = canvasDimensionsRef.current;
-        if (Math.abs(newWidth - oldDims.width) < 1 && Math.abs(newHeight - oldDims.height) < 1) {
-          return; // No significant change
-        }
-        
-        // Store brush strokes data for redrawing (they're stored in state, so we just redraw)
-        const fixedDpr = 1;
-        
-        // Update stored dimensions
-        canvasDimensionsRef.current = { width: newWidth, height: newHeight };
-        
-        // Resize base canvas
-        baseCanvas.width = newWidth * fixedDpr;
-        baseCanvas.height = newHeight * fixedDpr;
-        const newBaseCtx = baseCanvas.getContext('2d');
-        newBaseCtx.scale(fixedDpr, fixedDpr);
-        baseCanvas.style.width = `${newWidth}px`;
-        baseCanvas.style.height = `${newHeight}px`;
-        
-        // Resize user canvas
-        canvas.width = newWidth * fixedDpr;
-        canvas.height = newHeight * fixedDpr;
-        const newCtx = canvas.getContext('2d');
-        newCtx.scale(fixedDpr, fixedDpr);
-        canvas.style.width = `${newWidth}px`;
-        canvas.style.height = `${newHeight}px`;
-        
-        // Trigger a complete redraw of SVGs by updating redrawTrigger
-        // The useEffect watching currentStep will handle redrawing everything
-        setRedrawTrigger(prev => prev + 1);
-      };
-      
-      // Debounce resize handler to avoid excessive redraws
-      let resizeTimeout;
-      const debouncedResize = () => {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(handleResize, 100);
-      };
-      
-      window.addEventListener('resize', debouncedResize);
-      
-      // Also listen for devicePixelRatio changes (browser zoom)
-      // Using matchMedia to detect zoom changes
-      const mediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-      const handleZoomChange = () => {
-        // When zoom changes, just trigger a redraw with current dimensions
-        // The fixed DPR approach means we don't need to recalculate canvas size
-        setRedrawTrigger(prev => prev + 1);
-      };
-      mediaQuery.addEventListener('change', handleZoomChange);
+      // DO NOT resize canvas - keep it at fixed size to preserve brush strokes and text positions
+      // The canvas wrapper will handle overflow/scrolling if needed
+      // This ensures brush strokes and texts maintain their relative positions to SVGs
       
       return () => {
-        window.removeEventListener('resize', debouncedResize);
-        mediaQuery.removeEventListener('change', handleZoomChange);
-        clearTimeout(resizeTimeout);
+        // No cleanup needed since we removed resize listeners
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1746,16 +1687,6 @@ function Canvas({ language, onClose }) {
           image: nextStepData.exampleImage
         };
         messages.push(exampleMessage);
-        
-        // Add hint message after example
-        const exampleHintMessage = {
-          sender: 'hint',
-          text: language === 'EN' 
-            ? 'Feel free to create in your own way—you don\'t need to follow the example strictly.'
-            : '你可以自由发挥创作，不需要严格按照示例来绘画。',
-          timestamp: new Date().toISOString()
-        };
-        messages.push(exampleHintMessage);
       }
       
       setChatMessages(prevMessages => [...prevMessages, ...messages]);
@@ -2272,6 +2203,15 @@ function Canvas({ language, onClose }) {
             </button>
           </div>
         </div>
+
+        {/* Hint Text - Always visible above canvas */}
+        {currentStep >= 1 && (
+          <div className="canvas-hint-text">
+            {language === 'EN' 
+              ? 'This is your tree of life, you may draw beyond the lines or reshape the tree.'
+              : '这是你的生命之树。你可以画出轮廓之外，或重新塑造这棵树。'}
+          </div>
+        )}
 
         {/* Canvas - Dual Layer Structure */}
         <div className="canvas-wrapper">
