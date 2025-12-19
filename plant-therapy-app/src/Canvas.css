@@ -829,31 +829,74 @@
   font-weight: 900;
 }
 
-.save-finish-button {
-  background-color: #FFFFFF;
-  border: 2px solid #CCCCCC;
-  color: #87B26B;
+/* Completion Buttons Container */
+.completion-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+}
+
+.save-button,
+.finish-button {
   padding: 14px 32px;
   border-radius: 8px;
   font-size: 12pt;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
-.save-finish-button.active {
+.save-button {
+  background-color: #FFFFFF;
+  border: 2px solid #CCCCCC;
+  color: #87B26B;
+}
+
+.save-button.active {
+  border-color: #87B26B;
+  color: #87B26B;
+}
+
+.save-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-button:hover.active {
+  background-color: #f0f8ec;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(135, 178, 107, 0.2);
+}
+
+.save-button .button-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.finish-button {
+  background-color: #FFFFFF;
+  border: 2px solid #CCCCCC;
+  color: #87B26B;
+}
+
+.finish-button.active {
   background-color: #87B26B;
   border-color: #87B26B;
   color: #FFFFFF;
   font-weight: 900;
 }
 
-.save-finish-button:disabled {
+.finish-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.save-finish-button:hover.active {
+.finish-button:hover.active {
   background-color: #6fa054;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(135, 178, 107, 0.3);

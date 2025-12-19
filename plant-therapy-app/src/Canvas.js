@@ -47,6 +47,7 @@ function Canvas({ language, onClose }) {
   const [isCompleted, setIsCompleted] = useState(false);
   const [rating, setRating] = useState(null);
   const [hasSubmittedCurrentStep, setHasSubmittedCurrentStep] = useState(false);
+  const [finalImageUrl, setFinalImageUrl] = useState(null); // Store the final tree image for download
   
   // Chat-related state
   const [chatMessages, setChatMessages] = useState([]);
@@ -1074,6 +1075,80 @@ function Canvas({ language, onClose }) {
     }
   };
 
+  // Draw all completed colored SVGs on base canvas (for summary view)
+  const drawCompletedSvgsOnly = () => {
+    const baseCanvas = baseCanvasRef.current;
+    if (!baseCanvas) return;
+    
+    const ctx = baseCanvas.getContext('2d');
+    const fixedDpr = 1;
+    const displayWidth = parseFloat(baseCanvas.style.width) || baseCanvas.width / fixedDpr;
+    const displayHeight = parseFloat(baseCanvas.style.height) || baseCanvas.height / fixedDpr;
+    
+    // Clear base canvas
+    ctx.fillStyle = '#F5F5F5';
+    ctx.fillRect(0, 0, displayWidth, displayHeight);
+    
+    // Reset globalAlpha
+    ctx.globalAlpha = 1;
+    
+    // Draw back.svg first (at the very bottom, always visible)
+    if (backSvgRef.current && backSvgRef.current.complete) {
+      const centerX = displayWidth / 2;
+      const centerY = displayHeight / 2;
+      const offsetX = -150;
+      const startX = centerX + offsetX;
+      const startY = centerY;
+      const baseWidth = 655;
+      const baseHeight = 493;
+      const scale = 1.2;
+      const svgWidth = baseWidth * scale;
+      const svgHeight = baseHeight * scale;
+      const x = startX - svgWidth / 2;
+      const y = startY - svgHeight / 2;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(backSvgRef.current, x, y, svgWidth, svgHeight);
+    }
+    
+    // Draw all colored SVGs from Set 2 (completed steps)
+    const svgImagesSet2 = svgImagesSet2Ref.current;
+    if (svgImagesSet2 && svgImagesSet2.length > 0) {
+      const centerX = displayWidth / 2;
+      const centerY = displayHeight / 2;
+      const offsetX = -150;
+      const startX = centerX + offsetX;
+      const startY = centerY;
+      
+      const baseWidth = 655;
+      const baseHeight = 493;
+      const scale = 1.2;
+      const svgWidth = baseWidth * scale;
+      const svgHeight = baseHeight * scale;
+      
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
+      // Draw all colored SVGs
+      svgImagesSet2.forEach((svgImg, index) => {
+        const coloredSvg = coloredSvgsRef.current[index];
+        if (coloredSvg && coloredSvg.complete && svgImg && svgImg.complete) {
+          const x = startX - svgWidth / 2;
+          const y = startY - svgHeight / 2;
+          
+          // Use the colored version - full opacity
+          ctx.globalAlpha = 1.0;
+          const highResScale = 4;
+          const highResWidth = 655 * highResScale;
+          const highResHeight = 493 * highResScale;
+          ctx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
+        }
+      });
+      
+      ctx.globalAlpha = 1.0;
+    }
+  };
+
   // Fill current step's SVG with selected color (from Set 2)
   const fillCurrentStepSvg = (fillColor) => {
     // Skip if on introduction step (no SVG to fill)
@@ -1096,7 +1171,11 @@ function Canvas({ language, onClose }) {
     
     // Get the current step's SVG index
     const currentStepData = steps[currentStep];
-    if (!currentStepData || currentStepData.svgIndex === null) return;
+    if (!currentStepData || currentStepData.svgIndex === null) {
+      // For summary step, only draw completed colored SVGs
+      drawCompletedSvgsOnly();
+      return;
+    }
     
     const currentSvgIndex = currentStepData.svgIndex;
     
@@ -1801,7 +1880,14 @@ function Canvas({ language, onClose }) {
         // Check if this is the summary step
         if (nextStepData.isSummary) {
           // Summary step: Request LLM to generate closing reflection
+          // First, redraw base canvas to only show completed colored SVGs (remove current step's guide)
+          drawCompletedSvgsOnly();
           const canvasDataUrl = getCombinedCanvasDataUrl();
+          
+          // Save the final image for download later
+          if (canvasDataUrl) {
+            setFinalImageUrl(canvasDataUrl);
+          }
           
           const summaryRequestMessage = {
             sender: 'user',
@@ -1906,13 +1992,32 @@ function Canvas({ language, onClose }) {
           }
         }
       } else {
+        // Save the final image before showing completion screen
+        drawCompletedSvgsOnly();
+        const imageUrl = getCombinedCanvasDataUrl();
+        if (imageUrl) {
+          setFinalImageUrl(imageUrl);
+        }
         setIsCompleted(true);
       }
     }
   };
 
-  const handleSaveAndFinish = () => {
-    // Save canvas and close
+  // Save the final Tree of Life image to user's device
+  const handleSaveImage = () => {
+    if (finalImageUrl) {
+      // Create a download link
+      const link = document.createElement('a');
+      link.download = `Tree-of-Life-${new Date().toISOString().split('T')[0]}.png`;
+      link.href = finalImageUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  // Return to home page
+  const handleFinish = () => {
     onClose();
   };
 
@@ -1957,13 +2062,23 @@ function Canvas({ language, onClose }) {
             </div>
           </div>
 
-          <button 
-            className={`save-finish-button ${rating ? 'active' : ''}`}
-            onClick={handleSaveAndFinish}
-            disabled={!rating}
-          >
-            {language === 'EN' ? 'Save & Finish' : '保存并退出'}
-          </button>
+          <div className="completion-buttons">
+            <button 
+              className={`save-button ${rating ? 'active' : ''}`}
+              onClick={handleSaveImage}
+              disabled={!rating}
+            >
+              <img src="/element/export.svg" alt="Save" className="button-icon" />
+              {language === 'EN' ? 'Save Image' : '保存图片'}
+            </button>
+            <button 
+              className={`finish-button ${rating ? 'active' : ''}`}
+              onClick={handleFinish}
+              disabled={!rating}
+            >
+              {language === 'EN' ? 'Finish' : '完成'}
+            </button>
+          </div>
         </div>
       </div>
     );
