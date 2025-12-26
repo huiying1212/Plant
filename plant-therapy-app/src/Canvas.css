@@ -1565,7 +1565,8 @@
   border-radius: 16px;
   padding: 20px;
   min-width: 240px;
-  max-width: 300px;
+  max-width: 320px;
+  width: max-content;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
   pointer-events: auto;
   z-index: 10001;

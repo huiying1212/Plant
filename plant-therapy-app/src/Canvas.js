@@ -2746,6 +2746,13 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
   const [tooltipStyle, setTooltipStyle] = useState({});
   const [arrowStyle, setArrowStyle] = useState({});
+  const tooltipRef = useRef(null);
+  const [tooltipMeasured, setTooltipMeasured] = useState(false);
+  
+  // First effect: set initial position and trigger measurement
+  useEffect(() => {
+    setTooltipMeasured(false);
+  }, [step]);
   
   useEffect(() => {
     const targetEl = document.querySelector(step.targetSelector);
@@ -2761,18 +2768,21 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
       
       // Calculate tooltip position based on step.position
       const tooltipOffset = 20;
-      const tooltipWidth = 280; // Approximate tooltip width
-      const tooltipHeight = 180; // Approximate tooltip height
+      // Use actual tooltip dimensions if available, otherwise use estimates
+      let tooltipWidth = 320; // Default estimate (matches CSS max-width)
+      let tooltipHeight = 220; // Default estimate
+      
+      if (tooltipRef.current && tooltipMeasured) {
+        const tooltipRect = tooltipRef.current.getBoundingClientRect();
+        tooltipWidth = tooltipRect.width;
+        tooltipHeight = tooltipRect.height;
+      }
+      
       const screenPadding = 16; // Minimum distance from screen edge
       
       let newTooltipStyle = {};
       let newArrowStyle = {};
       let arrowPosition = step.position; // Track actual arrow position
-      
-      // Helper function to clamp value within screen bounds
-      const clampToScreen = (value, size, max) => {
-        return Math.min(Math.max(value, screenPadding), max - size - screenPadding);
-      };
       
       // Arrow dimensions
       const arrowWidth = 12;
@@ -2785,7 +2795,7 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
         case 'right': {
           // Tooltip appears to the RIGHT of target, arrow should point LEFT (toward target)
           let tooltipLeft = rect.right + tooltipOffset + padding;
-          let tooltipTop = rect.top + rect.height / 2 - tooltipHeight / 2;
+          const targetCenterY = rect.top + rect.height / 2;
           
           // Check if tooltip goes off right edge
           if (tooltipLeft + tooltipWidth > window.innerWidth - screenPadding) {
@@ -2794,24 +2804,35 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
             arrowPosition = 'left-flipped';
           }
           
-          // Clamp vertical position
-          tooltipTop = clampToScreen(tooltipTop, tooltipHeight, window.innerHeight);
+          // Position tooltip so arrow stays naturally within bounds (30-70% of height)
+          const idealArrowPos = tooltipHeight / 2; // Arrow at center
+          const minArrowPos = 30; // Minimum arrow position from top edge
+          const maxArrowPos = tooltipHeight - 30; // Maximum arrow position from top edge
+          
+          // Calculate tooltip top based on target center and ideal arrow position
+          let tooltipTop = targetCenterY - idealArrowPos;
+          
+          // Clamp tooltip to screen bounds
+          const minTop = screenPadding;
+          const maxTop = window.innerHeight - tooltipHeight - screenPadding;
+          tooltipTop = Math.min(Math.max(tooltipTop, minTop), maxTop);
+          
+          // Now calculate actual arrow position based on final tooltip position
+          let arrowTopOffset = targetCenterY - tooltipTop;
+          // Ensure arrow stays within natural bounds of tooltip
+          arrowTopOffset = Math.min(Math.max(arrowTopOffset, minArrowPos), maxArrowPos);
           
           newTooltipStyle = {
             top: tooltipTop,
             left: Math.max(tooltipLeft, screenPadding)
           };
           
-          // Calculate arrow vertical position to point at target center
-          const targetCenterY = rect.top + rect.height / 2 - tooltipTop;
-          const clampedArrowTop = Math.min(Math.max(targetCenterY, 24), tooltipHeight - 24);
-          
           if (arrowPosition === 'left-flipped') {
             // Tooltip is now on LEFT, arrow on RIGHT side pointing RIGHT
             newArrowStyle = {
               position: 'absolute',
               right: `-${arrowWidth}px`,
-              top: `${clampedArrowTop}px`,
+              top: `${arrowTopOffset}px`,
               transform: 'translateY(-50%) rotate(180deg)'
             };
           } else {
@@ -2819,7 +2840,7 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
             newArrowStyle = {
               position: 'absolute',
               left: `-${arrowWidth}px`,
-              top: `${clampedArrowTop}px`,
+              top: `${arrowTopOffset}px`,
               transform: 'translateY(-50%)'
             };
           }
@@ -2828,7 +2849,7 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
         case 'left': {
           // Tooltip appears to the LEFT of target, arrow should point RIGHT (toward target)
           let tooltipLeft = rect.left - tooltipOffset - padding - tooltipWidth;
-          let tooltipTop = rect.top + rect.height / 2 - tooltipHeight / 2;
+          const targetCenterY = rect.top + rect.height / 2;
           
           // Check if tooltip goes off left edge
           if (tooltipLeft < screenPadding) {
@@ -2837,24 +2858,35 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
             arrowPosition = 'right-flipped';
           }
           
-          // Clamp vertical position
-          tooltipTop = clampToScreen(tooltipTop, tooltipHeight, window.innerHeight);
+          // Position tooltip so arrow stays naturally within bounds (30-70% of height)
+          const idealArrowPos = tooltipHeight / 2; // Arrow at center
+          const minArrowPos = 30; // Minimum arrow position from top edge
+          const maxArrowPos = tooltipHeight - 30; // Maximum arrow position from top edge
+          
+          // Calculate tooltip top based on target center and ideal arrow position
+          let tooltipTop = targetCenterY - idealArrowPos;
+          
+          // Clamp tooltip to screen bounds
+          const minTop = screenPadding;
+          const maxTop = window.innerHeight - tooltipHeight - screenPadding;
+          tooltipTop = Math.min(Math.max(tooltipTop, minTop), maxTop);
+          
+          // Now calculate actual arrow position based on final tooltip position
+          let arrowTopOffset = targetCenterY - tooltipTop;
+          // Ensure arrow stays within natural bounds of tooltip
+          arrowTopOffset = Math.min(Math.max(arrowTopOffset, minArrowPos), maxArrowPos);
           
           newTooltipStyle = {
             top: tooltipTop,
             left: tooltipLeft
           };
           
-          // Calculate arrow vertical position to point at target center
-          const targetCenterY = rect.top + rect.height / 2 - tooltipTop;
-          const clampedArrowTop = Math.min(Math.max(targetCenterY, 24), tooltipHeight - 24);
-          
           if (arrowPosition === 'right-flipped') {
             // Tooltip is now on RIGHT, arrow on LEFT side pointing LEFT
             newArrowStyle = {
               position: 'absolute',
               left: `-${arrowWidth}px`,
-              top: `${clampedArrowTop}px`,
+              top: `${arrowTopOffset}px`,
               transform: 'translateY(-50%)'
             };
           } else {
@@ -2862,7 +2894,7 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
             newArrowStyle = {
               position: 'absolute',
               right: `-${arrowWidth}px`,
-              top: `${clampedArrowTop}px`,
+              top: `${arrowTopOffset}px`,
               transform: 'translateY(-50%) rotate(180deg)'
             };
           }
@@ -2871,7 +2903,7 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
         case 'bottom': {
           // Tooltip appears BELOW target, arrow should point UP (toward target)
           let tooltipTop = rect.bottom + tooltipOffset + padding;
-          let tooltipLeft = rect.left + rect.width / 2 - tooltipWidth / 2;
+          const targetCenterX = rect.left + rect.width / 2;
           
           // Check if tooltip goes off bottom edge
           if (tooltipTop + tooltipHeight > window.innerHeight - screenPadding) {
@@ -2880,25 +2912,36 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
             arrowPosition = 'top-flipped';
           }
           
-          // Clamp horizontal position
-          tooltipLeft = clampToScreen(tooltipLeft, tooltipWidth, window.innerWidth);
+          // Position tooltip so arrow stays naturally within bounds (30-70% of width)
+          // Arrow should ideally be at center of tooltip
+          const idealArrowPos = tooltipWidth / 2; // Arrow at center
+          const minArrowPos = 30; // Minimum arrow position from left edge
+          const maxArrowPos = tooltipWidth - 30; // Maximum arrow position from left edge
+          
+          // Calculate tooltip left based on target center and ideal arrow position
+          let tooltipLeft = targetCenterX - idealArrowPos - arrowHeight / 2;
+          
+          // Clamp tooltip to screen bounds
+          const minLeft = screenPadding;
+          const maxLeft = window.innerWidth - tooltipWidth - screenPadding;
+          tooltipLeft = Math.min(Math.max(tooltipLeft, minLeft), maxLeft);
+          
+          // Now calculate actual arrow position based on final tooltip position
+          let arrowLeftOffset = targetCenterX - tooltipLeft - arrowHeight / 2;
+          // Ensure arrow stays within natural bounds of tooltip
+          arrowLeftOffset = Math.min(Math.max(arrowLeftOffset, minArrowPos), maxArrowPos);
           
           newTooltipStyle = {
             top: Math.max(tooltipTop, screenPadding),
             left: tooltipLeft
           };
           
-          // Calculate arrow offset to point to target center
-          const targetCenterX = rect.left + rect.width / 2;
-          const arrowLeftOffset = targetCenterX - tooltipLeft - arrowHeight / 2;
-          const clampedArrowOffset = Math.min(Math.max(arrowLeftOffset, 20), tooltipWidth - 20 - arrowHeight);
-          
           if (arrowPosition === 'top-flipped') {
             // Tooltip is now on TOP, arrow on BOTTOM pointing DOWN (rotate -90°)
             newArrowStyle = {
               position: 'absolute',
               bottom: `-${arrowWidth}px`,
-              left: `${clampedArrowOffset}px`,
+              left: `${arrowLeftOffset}px`,
               transform: 'rotate(-90deg)',
               transformOrigin: 'center center'
             };
@@ -2907,7 +2950,7 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
             newArrowStyle = {
               position: 'absolute',
               top: `-${arrowWidth}px`,
-              left: `${clampedArrowOffset}px`,
+              left: `${arrowLeftOffset}px`,
               transform: 'rotate(90deg)',
               transformOrigin: 'center center'
             };
@@ -2917,7 +2960,7 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
         case 'top': {
           // Tooltip appears ABOVE target, arrow should point DOWN (toward target)
           let tooltipTop = rect.top - tooltipOffset - padding - tooltipHeight;
-          let tooltipLeft = rect.left + rect.width / 2 - tooltipWidth / 2;
+          const targetCenterX = rect.left + rect.width / 2;
           
           // Check if tooltip goes off top edge
           if (tooltipTop < screenPadding) {
@@ -2926,25 +2969,36 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
             arrowPosition = 'bottom-flipped';
           }
           
-          // Clamp horizontal position
-          tooltipLeft = clampToScreen(tooltipLeft, tooltipWidth, window.innerWidth);
+          // Position tooltip so arrow stays naturally within bounds (30-70% of width)
+          // Arrow should ideally be at center of tooltip
+          const idealArrowPos = tooltipWidth / 2; // Arrow at center
+          const minArrowPos = 30; // Minimum arrow position from left edge
+          const maxArrowPos = tooltipWidth - 30; // Maximum arrow position from left edge
+          
+          // Calculate tooltip left based on target center and ideal arrow position
+          let tooltipLeft = targetCenterX - idealArrowPos - arrowHeight / 2;
+          
+          // Clamp tooltip to screen bounds
+          const minLeft = screenPadding;
+          const maxLeft = window.innerWidth - tooltipWidth - screenPadding;
+          tooltipLeft = Math.min(Math.max(tooltipLeft, minLeft), maxLeft);
+          
+          // Now calculate actual arrow position based on final tooltip position
+          let arrowLeftOffset = targetCenterX - tooltipLeft - arrowHeight / 2;
+          // Ensure arrow stays within natural bounds of tooltip
+          arrowLeftOffset = Math.min(Math.max(arrowLeftOffset, minArrowPos), maxArrowPos);
           
           newTooltipStyle = {
             top: tooltipTop,
             left: tooltipLeft
           };
           
-          // Calculate arrow offset to point to target center
-          const targetCenterX = rect.left + rect.width / 2;
-          const arrowLeftOffset = targetCenterX - tooltipLeft - arrowHeight / 2;
-          const clampedArrowOffset = Math.min(Math.max(arrowLeftOffset, 20), tooltipWidth - 20 - arrowHeight);
-          
           if (arrowPosition === 'bottom-flipped') {
             // Tooltip is now on BOTTOM, arrow on TOP pointing UP (rotate 90°)
             newArrowStyle = {
               position: 'absolute',
               top: `-${arrowWidth}px`,
-              left: `${clampedArrowOffset}px`,
+              left: `${arrowLeftOffset}px`,
               transform: 'rotate(90deg)',
               transformOrigin: 'center center'
             };
@@ -2953,7 +3007,7 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
             newArrowStyle = {
               position: 'absolute',
               bottom: `-${arrowWidth}px`,
-              left: `${clampedArrowOffset}px`,
+              left: `${arrowLeftOffset}px`,
               transform: 'rotate(-90deg)',
               transformOrigin: 'center center'
             };
@@ -2966,8 +3020,15 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
       
       setTooltipStyle(newTooltipStyle);
       setArrowStyle(newArrowStyle);
+      
+      // Trigger measurement after first render
+      if (!tooltipMeasured) {
+        requestAnimationFrame(() => {
+          setTooltipMeasured(true);
+        });
+      }
     }
-  }, [step]);
+  }, [step, tooltipMeasured]);
   
   return (
     <>
@@ -2983,7 +3044,7 @@ function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, o
       />
       
       {/* Tooltip with arrow */}
-      <div className="tutorial-tooltip" style={tooltipStyle}>
+      <div className="tutorial-tooltip" style={tooltipStyle} ref={tooltipRef}>
         {/* Arrow */}
         <div className="tutorial-arrow" style={arrowStyle}>
           <svg width="12" height="20" viewBox="0 0 12 20" fill="none">
