@@ -49,6 +49,80 @@ function Canvas({ language, onClose }) {
   const [hasSubmittedCurrentStep, setHasSubmittedCurrentStep] = useState(false);
   const [finalImageUrl, setFinalImageUrl] = useState(null); // Store the final tree image for download
   
+  // Tutorial state
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
+  
+  // Tutorial steps configuration
+  const tutorialSteps = useMemo(() => {
+    return [
+      {
+        targetSelector: '.home-btn',
+        position: 'right',
+        titleEN: 'Home',
+        titleCN: '返回主页',
+        descEN: 'Click to return to home page',
+        descCN: '点击返回主页'
+      },
+      {
+        targetSelector: '.toolbar-actions',
+        position: 'right',
+        titleEN: 'Undo/Redo',
+        titleCN: '撤销/重做',
+        descEN: 'Undo or redo your drawing actions',
+        descCN: '撤销或重做绘画操作'
+      },
+      {
+        targetSelector: '.progress-indicator',
+        position: 'bottom',
+        titleEN: 'Progress',
+        titleCN: '进度条',
+        descEN: 'Shows your current progress through the steps',
+        descCN: '显示当前步骤进度'
+      },
+      {
+        targetSelector: '.left-sidebar',
+        position: 'right',
+        titleEN: 'Drawing Tools',
+        titleCN: '绘画工具栏',
+        descEN: 'Brush size, opacity, pen, fill, eraser, and text tools',
+        descCN: '笔刷大小、透明度、画笔、填充、橡皮擦和文字工具'
+      },
+      {
+        targetSelector: '.chat-panel',
+        position: 'left',
+        titleEN: 'AI Guide',
+        titleCN: '聊天浮窗',
+        descEN: 'Get guidance and chat with AI assistant',
+        descCN: '获取指导并与AI助手聊天'
+      },
+      {
+        targetSelector: '.next-step-btn-floating',
+        position: 'top',
+        titleEN: 'Next Step',
+        titleCN: '下一步',
+        descEN: 'Click to proceed to the next step',
+        descCN: '点击进入下一步'
+      },
+      {
+        targetSelector: '.microphone-btn',
+        position: 'top',
+        titleEN: 'Voice Input',
+        titleCN: '语音输入',
+        descEN: 'Click to start voice input',
+        descCN: '点击开启语音输入'
+      },
+      {
+        targetSelector: '.speaker-btn',
+        position: 'top',
+        titleEN: 'Voice Output',
+        titleCN: '语音播放',
+        descEN: 'Toggle voice output for responses',
+        descCN: '开启或关闭语音播放'
+      }
+    ];
+  }, []);
+  
   // Chat-related state
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
@@ -638,6 +712,18 @@ function Canvas({ language, onClose }) {
       ttsService.stop();
     }
   }, [isSpeakerOn]);
+
+  // Show tutorial when entering Tree of Life (Step 0)
+  useEffect(() => {
+    if (currentStep === 0) {
+      // Delay slightly to ensure all DOM elements are rendered
+      const timer = setTimeout(() => {
+        setShowTutorial(true);
+        setTutorialStep(0);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep]);
 
   // Function to redraw brush strokes
   const redrawBrushStrokes = (ctx) => {
@@ -2623,7 +2709,323 @@ function Canvas({ language, onClose }) {
           </div>
         </div>
       </aside>
+
+      {/* Tutorial Overlay */}
+      {showTutorial && (
+        <div className="tutorial-overlay">
+          <div className="tutorial-backdrop" onClick={() => setShowTutorial(false)} />
+          
+          {/* Tutorial Highlight and Tooltip */}
+          <TutorialHighlight
+            step={tutorialSteps[tutorialStep]}
+            language={language}
+            currentIndex={tutorialStep}
+            totalSteps={tutorialSteps.length}
+            onNext={() => {
+              if (tutorialStep < tutorialSteps.length - 1) {
+                setTutorialStep(tutorialStep + 1);
+              } else {
+                setShowTutorial(false);
+              }
+            }}
+            onPrev={() => {
+              if (tutorialStep > 0) {
+                setTutorialStep(tutorialStep - 1);
+              }
+            }}
+            onSkip={() => setShowTutorial(false)}
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+// Tutorial Highlight Component
+function TutorialHighlight({ step, language, currentIndex, totalSteps, onNext, onPrev, onSkip }) {
+  const [position, setPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
+  const [tooltipStyle, setTooltipStyle] = useState({});
+  const [arrowStyle, setArrowStyle] = useState({});
+  
+  useEffect(() => {
+    const targetEl = document.querySelector(step.targetSelector);
+    if (targetEl) {
+      const rect = targetEl.getBoundingClientRect();
+      const padding = 8;
+      setPosition({
+        top: rect.top - padding,
+        left: rect.left - padding,
+        width: rect.width + padding * 2,
+        height: rect.height + padding * 2
+      });
+      
+      // Calculate tooltip position based on step.position
+      const tooltipOffset = 20;
+      const tooltipWidth = 280; // Approximate tooltip width
+      const tooltipHeight = 180; // Approximate tooltip height
+      const screenPadding = 16; // Minimum distance from screen edge
+      
+      let newTooltipStyle = {};
+      let newArrowStyle = {};
+      let arrowPosition = step.position; // Track actual arrow position
+      
+      // Helper function to clamp value within screen bounds
+      const clampToScreen = (value, size, max) => {
+        return Math.min(Math.max(value, screenPadding), max - size - screenPadding);
+      };
+      
+      // Arrow dimensions
+      const arrowWidth = 12;
+      const arrowHeight = 20;
+      
+      // SVG arrow points LEFT by default (M0 10L12 0V20L0 10Z)
+      // Rotations: 0° = left, 180° = right, 90° = up, -90° = down
+      
+      switch (step.position) {
+        case 'right': {
+          // Tooltip appears to the RIGHT of target, arrow should point LEFT (toward target)
+          let tooltipLeft = rect.right + tooltipOffset + padding;
+          let tooltipTop = rect.top + rect.height / 2 - tooltipHeight / 2;
+          
+          // Check if tooltip goes off right edge
+          if (tooltipLeft + tooltipWidth > window.innerWidth - screenPadding) {
+            // Switch to left side
+            tooltipLeft = rect.left - tooltipOffset - padding - tooltipWidth;
+            arrowPosition = 'left-flipped';
+          }
+          
+          // Clamp vertical position
+          tooltipTop = clampToScreen(tooltipTop, tooltipHeight, window.innerHeight);
+          
+          newTooltipStyle = {
+            top: tooltipTop,
+            left: Math.max(tooltipLeft, screenPadding)
+          };
+          
+          // Calculate arrow vertical position to point at target center
+          const targetCenterY = rect.top + rect.height / 2 - tooltipTop;
+          const clampedArrowTop = Math.min(Math.max(targetCenterY, 24), tooltipHeight - 24);
+          
+          if (arrowPosition === 'left-flipped') {
+            // Tooltip is now on LEFT, arrow on RIGHT side pointing RIGHT
+            newArrowStyle = {
+              position: 'absolute',
+              right: `-${arrowWidth}px`,
+              top: `${clampedArrowTop}px`,
+              transform: 'translateY(-50%) rotate(180deg)'
+            };
+          } else {
+            // Tooltip on RIGHT, arrow on LEFT side pointing LEFT (no rotation needed)
+            newArrowStyle = {
+              position: 'absolute',
+              left: `-${arrowWidth}px`,
+              top: `${clampedArrowTop}px`,
+              transform: 'translateY(-50%)'
+            };
+          }
+          break;
+        }
+        case 'left': {
+          // Tooltip appears to the LEFT of target, arrow should point RIGHT (toward target)
+          let tooltipLeft = rect.left - tooltipOffset - padding - tooltipWidth;
+          let tooltipTop = rect.top + rect.height / 2 - tooltipHeight / 2;
+          
+          // Check if tooltip goes off left edge
+          if (tooltipLeft < screenPadding) {
+            // Switch to right side
+            tooltipLeft = rect.right + tooltipOffset + padding;
+            arrowPosition = 'right-flipped';
+          }
+          
+          // Clamp vertical position
+          tooltipTop = clampToScreen(tooltipTop, tooltipHeight, window.innerHeight);
+          
+          newTooltipStyle = {
+            top: tooltipTop,
+            left: tooltipLeft
+          };
+          
+          // Calculate arrow vertical position to point at target center
+          const targetCenterY = rect.top + rect.height / 2 - tooltipTop;
+          const clampedArrowTop = Math.min(Math.max(targetCenterY, 24), tooltipHeight - 24);
+          
+          if (arrowPosition === 'right-flipped') {
+            // Tooltip is now on RIGHT, arrow on LEFT side pointing LEFT
+            newArrowStyle = {
+              position: 'absolute',
+              left: `-${arrowWidth}px`,
+              top: `${clampedArrowTop}px`,
+              transform: 'translateY(-50%)'
+            };
+          } else {
+            // Tooltip on LEFT, arrow on RIGHT side pointing RIGHT (rotate 180°)
+            newArrowStyle = {
+              position: 'absolute',
+              right: `-${arrowWidth}px`,
+              top: `${clampedArrowTop}px`,
+              transform: 'translateY(-50%) rotate(180deg)'
+            };
+          }
+          break;
+        }
+        case 'bottom': {
+          // Tooltip appears BELOW target, arrow should point UP (toward target)
+          let tooltipTop = rect.bottom + tooltipOffset + padding;
+          let tooltipLeft = rect.left + rect.width / 2 - tooltipWidth / 2;
+          
+          // Check if tooltip goes off bottom edge
+          if (tooltipTop + tooltipHeight > window.innerHeight - screenPadding) {
+            // Switch to top
+            tooltipTop = rect.top - tooltipOffset - padding - tooltipHeight;
+            arrowPosition = 'top-flipped';
+          }
+          
+          // Clamp horizontal position
+          tooltipLeft = clampToScreen(tooltipLeft, tooltipWidth, window.innerWidth);
+          
+          newTooltipStyle = {
+            top: Math.max(tooltipTop, screenPadding),
+            left: tooltipLeft
+          };
+          
+          // Calculate arrow offset to point to target center
+          const targetCenterX = rect.left + rect.width / 2;
+          const arrowLeftOffset = targetCenterX - tooltipLeft - arrowHeight / 2;
+          const clampedArrowOffset = Math.min(Math.max(arrowLeftOffset, 20), tooltipWidth - 20 - arrowHeight);
+          
+          if (arrowPosition === 'top-flipped') {
+            // Tooltip is now on TOP, arrow on BOTTOM pointing DOWN (rotate -90°)
+            newArrowStyle = {
+              position: 'absolute',
+              bottom: `-${arrowWidth}px`,
+              left: `${clampedArrowOffset}px`,
+              transform: 'rotate(-90deg)',
+              transformOrigin: 'center center'
+            };
+          } else {
+            // Tooltip on BOTTOM, arrow on TOP pointing UP (rotate 90°)
+            newArrowStyle = {
+              position: 'absolute',
+              top: `-${arrowWidth}px`,
+              left: `${clampedArrowOffset}px`,
+              transform: 'rotate(90deg)',
+              transformOrigin: 'center center'
+            };
+          }
+          break;
+        }
+        case 'top': {
+          // Tooltip appears ABOVE target, arrow should point DOWN (toward target)
+          let tooltipTop = rect.top - tooltipOffset - padding - tooltipHeight;
+          let tooltipLeft = rect.left + rect.width / 2 - tooltipWidth / 2;
+          
+          // Check if tooltip goes off top edge
+          if (tooltipTop < screenPadding) {
+            // Switch to bottom
+            tooltipTop = rect.bottom + tooltipOffset + padding;
+            arrowPosition = 'bottom-flipped';
+          }
+          
+          // Clamp horizontal position
+          tooltipLeft = clampToScreen(tooltipLeft, tooltipWidth, window.innerWidth);
+          
+          newTooltipStyle = {
+            top: tooltipTop,
+            left: tooltipLeft
+          };
+          
+          // Calculate arrow offset to point to target center
+          const targetCenterX = rect.left + rect.width / 2;
+          const arrowLeftOffset = targetCenterX - tooltipLeft - arrowHeight / 2;
+          const clampedArrowOffset = Math.min(Math.max(arrowLeftOffset, 20), tooltipWidth - 20 - arrowHeight);
+          
+          if (arrowPosition === 'bottom-flipped') {
+            // Tooltip is now on BOTTOM, arrow on TOP pointing UP (rotate 90°)
+            newArrowStyle = {
+              position: 'absolute',
+              top: `-${arrowWidth}px`,
+              left: `${clampedArrowOffset}px`,
+              transform: 'rotate(90deg)',
+              transformOrigin: 'center center'
+            };
+          } else {
+            // Tooltip on TOP, arrow on BOTTOM pointing DOWN (rotate -90°)
+            newArrowStyle = {
+              position: 'absolute',
+              bottom: `-${arrowWidth}px`,
+              left: `${clampedArrowOffset}px`,
+              transform: 'rotate(-90deg)',
+              transformOrigin: 'center center'
+            };
+          }
+          break;
+        }
+        default:
+          break;
+      }
+      
+      setTooltipStyle(newTooltipStyle);
+      setArrowStyle(newArrowStyle);
+    }
+  }, [step]);
+  
+  return (
+    <>
+      {/* Highlight box around target element */}
+      <div 
+        className="tutorial-highlight-box"
+        style={{
+          top: position.top,
+          left: position.left,
+          width: position.width,
+          height: position.height
+        }}
+      />
+      
+      {/* Tooltip with arrow */}
+      <div className="tutorial-tooltip" style={tooltipStyle}>
+        {/* Arrow */}
+        <div className="tutorial-arrow" style={arrowStyle}>
+          <svg width="12" height="20" viewBox="0 0 12 20" fill="none">
+            <path d="M0 10L12 0V20L0 10Z" fill="#E8E4D9"/>
+          </svg>
+        </div>
+        
+        {/* Content */}
+        <div className="tutorial-content">
+          <div className="tutorial-title">
+            {language === 'EN' ? step.titleEN : step.titleCN}
+          </div>
+          <div className="tutorial-desc">
+            {language === 'EN' ? step.descEN : step.descCN}
+          </div>
+        </div>
+        
+        {/* Navigation */}
+        <div className="tutorial-nav">
+          <span className="tutorial-progress">
+            {currentIndex + 1} / {totalSteps}
+          </span>
+          <div className="tutorial-buttons">
+            {currentIndex > 0 && (
+              <button className="tutorial-btn tutorial-prev" onClick={onPrev}>
+                {language === 'EN' ? 'Prev' : '上一步'}
+              </button>
+            )}
+            <button className="tutorial-btn tutorial-next" onClick={onNext}>
+              {currentIndex < totalSteps - 1 
+                ? (language === 'EN' ? 'Next' : '下一步')
+                : (language === 'EN' ? 'Done' : '完成')}
+            </button>
+          </div>
+        </div>
+        
+        {/* Skip button */}
+        <button className="tutorial-skip" onClick={onSkip}>
+          {language === 'EN' ? 'Skip Tutorial' : '跳过教程'}
+        </button>
+      </div>
+    </>
   );
 }
 
