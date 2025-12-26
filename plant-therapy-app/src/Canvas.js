@@ -2100,11 +2100,10 @@ function Canvas({ language, onClose }) {
     <div className="canvas-container">
       {/* Top Toolbar */}
       <div className="canvas-toolbar">
-        <button className="toolbar-btn home-btn" onClick={onClose}>
-          <img src="/element/home.svg" alt="Home" />
-        </button>
-        
-        <div className="toolbar-center">
+        <div className="toolbar-left">
+          <button className="toolbar-btn home-btn" onClick={onClose}>
+            <img src="/element/home.svg" alt="Home" />
+          </button>
           <div className="toolbar-actions">
             <button className="toolbar-btn" onClick={undo} disabled={historyStep === 0}>
               <img src="/element/undo.svg" alt="Undo" />
@@ -2113,7 +2112,9 @@ function Canvas({ language, onClose }) {
               <img src="/element/redo.svg" alt="Redo" />
             </button>
           </div>
-
+        </div>
+        
+        <div className="toolbar-center">
           {/* Progress Indicator */}
           <div className="progress-indicator">
             {steps.map((_, idx) => (

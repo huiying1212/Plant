@@ -61,6 +61,12 @@
   filter: invert(45%) sepia(69%) saturate(444%) hue-rotate(55deg) brightness(93%) contrast(87%);
 }
 
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .toolbar-center {
   display: flex;
   flex-direction: column;
@@ -89,13 +95,13 @@
 /* Progress Indicator */
 .progress-indicator {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 
 .progress-dash {
-  width: 24px;
-  height: 3px;
+  width: 32px;
+  height: 4px;
   border-radius: 2px;
   transition: all 0.3s ease;
 }
@@ -109,9 +115,9 @@
   background: repeating-linear-gradient(
     to right,
     #CCCCCC 0px,
-    #CCCCCC 3px,
-    transparent 3px,
-    transparent 6px
+    #CCCCCC 4px,
+    transparent 4px,
+    transparent 8px
   );
   border: none;
 }
@@ -536,7 +542,7 @@
 .canvas-hint-text {
   position: absolute;
   top: 20px;
-  left: 100px;
+  left: 180px;
   z-index: 25;
   font-size: 8pt;
   color: #999999;
