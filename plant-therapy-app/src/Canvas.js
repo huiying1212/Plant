@@ -14,6 +14,7 @@ function Canvas({ language, onClose }) {
   const [brushOpacity, setBrushOpacity] = useState(100);
   const [currentColor, setCurrentColor] = useState('#EA5851');
   const [baseColor, setBaseColor] = useState('#EA5851');
+  // eslint-disable-next-line no-unused-vars
   const [colorBrightness, setColorBrightness] = useState(50);
   const [recentColors, setRecentColors] = useState(['#EA5851']);
   const [showColorWheel, setShowColorWheel] = useState(false);
@@ -28,6 +29,7 @@ function Canvas({ language, onClose }) {
   const [fillBrightness, setFillBrightness] = useState(50);
   const [showTextInput, setShowTextInput] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [isMicrophoneOn, setIsMicrophoneOn] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [chatPanelOpen, setChatPanelOpen] = useState(true);
