@@ -65,14 +65,6 @@ function Canvas({ language, onClose }) {
         descCN: '点击返回主页'
       },
       {
-        targetSelector: '.toolbar-actions',
-        position: 'right',
-        titleEN: 'Undo/Redo',
-        titleCN: '撤销/重做',
-        descEN: 'Undo or redo your drawing actions',
-        descCN: '撤销或重做绘画操作'
-      },
-      {
         targetSelector: '.progress-indicator',
         position: 'bottom',
         titleEN: 'Progress',
@@ -331,8 +323,8 @@ function Canvas({ language, onClose }) {
       const svgFilesSet1CN = [
         '01 ROOT.svg',
         '02 TRUNK.svg',
-        '03 BRUNCH.svg',
-        '04 LEAF.svg',
+        '03 BRANCH.svg',
+        '04 LEAVES.svg',
         '05 FLOWER.svg',
         '06 BUG.svg',
         '07 STORM.svg'
@@ -345,7 +337,7 @@ function Canvas({ language, onClose }) {
       // displayWidth and displayHeight are already defined above
       const centerX = displayWidth / 2;
       const centerY = displayHeight / 2;
-      const offsetX = -150; // Offset to the left (negative = left)
+      const offsetX = 0; // Offset to the left (negative = left)
       const startX = centerX + offsetX;
       const startY = centerY;
       
@@ -503,7 +495,7 @@ function Canvas({ language, onClose }) {
     
     const centerX = displayWidth / 2;
     const centerY = displayHeight / 2;
-    const offsetX = -150;
+    const offsetX = 0;
     const startX = centerX + offsetX;
     const startY = centerY;
     
@@ -1182,7 +1174,7 @@ function Canvas({ language, onClose }) {
     if (backSvgRef.current && backSvgRef.current.complete) {
       const centerX = displayWidth / 2;
       const centerY = displayHeight / 2;
-      const offsetX = -150;
+      const offsetX = 0;
       const startX = centerX + offsetX;
       const startY = centerY;
       const baseWidth = 655;
@@ -1202,7 +1194,7 @@ function Canvas({ language, onClose }) {
     if (svgImagesSet2 && svgImagesSet2.length > 0) {
       const centerX = displayWidth / 2;
       const centerY = displayHeight / 2;
-      const offsetX = -150;
+      const offsetX = 0;
       const startX = centerX + offsetX;
       const startY = centerY;
       
@@ -1215,19 +1207,24 @@ function Canvas({ language, onClose }) {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       
-      // Draw all colored SVGs
+      // Draw all SVGs - use colored version if available, otherwise use original template
       svgImagesSet2.forEach((svgImg, index) => {
-        const coloredSvg = coloredSvgsRef.current[index];
-        if (coloredSvg && coloredSvg.complete && svgImg && svgImg.complete) {
+        if (svgImg && svgImg.complete) {
           const x = startX - svgWidth / 2;
           const y = startY - svgHeight / 2;
-          
-          // Use the colored version - full opacity
           ctx.globalAlpha = 1.0;
-          const highResScale = 4;
-          const highResWidth = 655 * highResScale;
-          const highResHeight = 493 * highResScale;
-          ctx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
+          
+          const coloredSvg = coloredSvgsRef.current[index];
+          if (coloredSvg && coloredSvg.complete) {
+            // Use the colored version - full opacity
+            const highResScale = 4;
+            const highResWidth = 655 * highResScale;
+            const highResHeight = 493 * highResScale;
+            ctx.drawImage(coloredSvg, 0, 0, highResWidth, highResHeight, x, y, svgWidth, svgHeight);
+          } else {
+            // Use original SVG template if not colored
+            ctx.drawImage(svgImg, x, y, svgWidth, svgHeight);
+          }
         }
       });
       
@@ -1269,7 +1266,7 @@ function Canvas({ language, onClose }) {
     if (backSvgRef.current && backSvgRef.current.complete) {
       const centerX = displayWidth / 2;
       const centerY = displayHeight / 2;
-      const offsetX = -150;
+      const offsetX = 0;
       const startX = centerX + offsetX;
       const startY = centerY;
       const baseWidth = 655;
@@ -1290,7 +1287,7 @@ function Canvas({ language, onClose }) {
     if (svgImagesSet2 && svgImagesSet2.length > 0) {
       const centerX = displayWidth / 2;
       const centerY = displayHeight / 2;
-      const offsetX = -150;
+      const offsetX = 0;
       const startX = centerX + offsetX;
       const startY = centerY;
       
@@ -1335,7 +1332,7 @@ function Canvas({ language, onClose }) {
     if (svgImagesSet1 && svgImagesSet1.length > 0) {
       const centerX = displayWidth / 2;
       const centerY = displayHeight / 2;
-      const offsetX = -150;
+      const offsetX = 0;
       const startX = centerX + offsetX;
       const startY = centerY;
       
@@ -1418,7 +1415,7 @@ function Canvas({ language, onClose }) {
       // Draw the modified SVG on the main canvas (on top of everything)
       const centerX = displayWidth / 2;
       const centerY = displayHeight / 2;
-      const offsetX = -150;
+      const offsetX = 0;
       const startX = centerX + offsetX;
       const startY = centerY;
       
@@ -1450,7 +1447,7 @@ function Canvas({ language, onClose }) {
       if (svgImagesSet2 && svgImagesSet2[bugsIndex]) {
         const centerX = displayWidth / 2;
         const centerY = displayHeight / 2;
-        const offsetX = -150;
+        const offsetX = 0;
         const startX = centerX + offsetX;
         const startY = centerY;
         
@@ -2049,16 +2046,6 @@ function Canvas({ language, onClose }) {
               image: nextStepData.exampleImage
             };
             messages.push(exampleMessage);
-            
-            // Add hint message after example
-            const exampleHintMessage = {
-              sender: 'hint',
-              text: language === 'EN' 
-                ? 'Feel free to create in your own way—you don\'t need to follow the example strictly.'
-                : '你可以自由发挥创作，不需要严格按照示例来绘画。',
-              timestamp: new Date().toISOString()
-            };
-            messages.push(exampleHintMessage);
           }
           
           setChatMessages(prevMessages => [...prevMessages, ...messages]);
@@ -2190,14 +2177,6 @@ function Canvas({ language, onClose }) {
           <button className="toolbar-btn home-btn" onClick={onClose}>
             <img src="/element/home.svg" alt="Home" />
           </button>
-          <div className="toolbar-actions">
-            <button className="toolbar-btn" onClick={undo} disabled={historyStep === 0}>
-              <img src="/element/undo.svg" alt="Undo" />
-            </button>
-            <button className="toolbar-btn" onClick={redo} disabled={history.length === 0 || historyStep >= history.length - 1}>
-              <img src="/element/redo.svg" alt="Redo" />
-            </button>
-          </div>
         </div>
         
         <div className="toolbar-center">
@@ -2211,15 +2190,6 @@ function Canvas({ language, onClose }) {
             ))}
           </div>
         </div>
-
-        {!chatPanelOpen && (
-        <button 
-            className="toolbar-btn ai-btn"
-            onClick={() => setChatPanelOpen(true)}
-        >
-          <img src="/element/robot.svg" alt="AI" />
-        </button>
-        )}
       </div>
 
       {/* Main Canvas Area */}
@@ -2404,16 +2374,29 @@ function Canvas({ language, onClose }) {
               <img src="/element/keyboard.svg" alt="Text" />
             </button>
           </div>
-        </div>
 
-        {/* Hint Text - Always visible above canvas */}
-        {currentStep >= 1 && (
-          <div className="canvas-hint-text">
-            {language === 'EN' 
-              ? 'This is your tree of life, you may draw beyond the lines or reshape the tree.'
-              : '这是你的生命之树。你可以画出轮廓之外，或重新塑造这棵树。'}
+          <div className="sidebar-divider"></div>
+
+          {/* Undo/Redo Buttons */}
+          <div className="undo-redo-tools">
+            <button 
+              className="vertical-tool-btn undo-btn" 
+              onClick={undo} 
+              disabled={historyStep === 0}
+              title={language === 'EN' ? 'Undo' : '撤销'}
+            >
+              <img src="/element/undo.svg" alt="Undo" />
+            </button>
+            <button 
+              className="vertical-tool-btn redo-btn" 
+              onClick={redo} 
+              disabled={history.length === 0 || historyStep >= history.length - 1}
+              title={language === 'EN' ? 'Redo' : '重做'}
+            >
+              <img src="/element/redo.svg" alt="Redo" />
+            </button>
           </div>
-        )}
+        </div>
 
         {/* Canvas - Dual Layer Structure */}
         <div className="canvas-wrapper">
@@ -2463,11 +2446,57 @@ function Canvas({ language, onClose }) {
               </button>
             </div>
           )}
+
+          {/* Hint Text - Below canvas */}
+          {currentStep >= 1 && (
+            <div className="canvas-hint-text">
+              {language === 'EN' 
+                ? 'This is your tree of life, you may draw beyond the lines or reshape the tree.'
+                : '这是你的生命之树。你可以画出轮廓之外，或重新塑造这棵树。'}
+            </div>
+          )}
         </div>
 
 
-        {/* Right Bottom Buttons - Above Bottom Toolbar */}
+        {/* Left Bottom Buttons - Below Chat Panel */}
         <div className="right-bottom-buttons">
+          {/* Microphone Button */}
+          <button 
+            className={`bottom-tool-btn microphone-btn ${isRecording ? 'active recording' : ''}`}
+            onClick={handleMicrophoneClick}
+            title={language === 'EN' 
+              ? (isRecording ? 'Stop recording' : 'Start voice input') 
+              : (isRecording ? '停止录音' : '开始语音输入')}
+          >
+            <img src="/element/microphone.svg" alt="Microphone" />
+            {isRecording && (
+              <span className="recording-indicator">●</span>
+            )}
+          </button>
+          
+          {/* Speaker Button */}
+          <button 
+            className={`bottom-tool-btn speaker-btn ${isSpeakerOn ? 'active' : ''}`}
+            onClick={() => {
+              const newState = !isSpeakerOn;
+              console.log('[Canvas] Speaker button clicked. New state:', newState);
+              setIsSpeakerOn(newState);
+            }}
+          >
+            <img src="/element/unmute.svg" alt="Speaker" />
+          </button>
+
+          {/* AI Chat Panel Toggle Button */}
+          {!chatPanelOpen && (
+            <button 
+              className="bottom-tool-btn ai-toggle-btn"
+              onClick={() => setChatPanelOpen(true)}
+              title={language === 'EN' ? 'Open AI Assistant' : '打开AI助手'}
+            >
+              <img src="/element/robot.svg" alt="AI" />
+            </button>
+          )}
+          
           {/* Re-edit Button - shown when drawing is submitted (not on summary step) */}
           {hasSubmittedCurrentStep && currentStep > 0 && !steps[currentStep]?.isSummary && (
             <button 
@@ -2490,7 +2519,7 @@ function Canvas({ language, onClose }) {
             </button>
           )}
           
-          {/* Next Step Button */}
+          {/* Next Step / Submit Drawing Button */}
           {currentStep < steps.length - 1 && (
             <button 
               type="button"
@@ -2533,29 +2562,6 @@ function Canvas({ language, onClose }) {
               )}
             </button>
           )}
-          
-          <button 
-            className={`bottom-tool-btn microphone-btn ${isRecording ? 'active recording' : ''}`}
-            onClick={handleMicrophoneClick}
-            title={language === 'EN' 
-              ? (isRecording ? 'Stop recording' : 'Start voice input') 
-              : (isRecording ? '停止录音' : '开始语音输入')}
-          >
-            <img src="/element/microphone.svg" alt="Microphone" />
-            {isRecording && (
-              <span className="recording-indicator">●</span>
-            )}
-          </button>
-          <button 
-            className={`bottom-tool-btn speaker-btn ${isSpeakerOn ? 'active' : ''}`}
-            onClick={() => {
-              const newState = !isSpeakerOn;
-              console.log('[Canvas] Speaker button clicked. New state:', newState);
-              setIsSpeakerOn(newState);
-            }}
-          >
-            <img src="/element/unmute.svg" alt="Speaker" />
-          </button>
         </div>
       </div>
 

@@ -68,11 +68,13 @@
 }
 
 .toolbar-center {
+  position: absolute;
+  left: 460px;          /* aligned with canvas wrapper */
+  right: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  flex: 1;
 }
 
 .toolbar-actions {
@@ -129,6 +131,7 @@
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  background-color: #F5F5F5;
 }
 
 /* Left Sidebar */
@@ -136,15 +139,15 @@
   position: absolute;
   left: 0;
   top: 80px;
-  width: 80px;
+  width: 64px;
   background: linear-gradient(180deg, #FFFFFF 0%, #FAFAFA 100%);
   border-radius: 0 16px 16px 0;
-  padding: 16px 12px;
+  padding: 12px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  z-index: 10;
+  gap: 4px;
+  z-index: 40;
   box-shadow: 2px 0 20px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.1);
   border: none;
 }
@@ -159,8 +162,8 @@
 }
 
 .slider-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -169,8 +172,8 @@
 }
 
 .slider-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .slider-group:hover .slider-icon {
@@ -179,17 +182,17 @@
 
 /* Sidebar Divider */
 .sidebar-divider {
-  width: 32px;
+  width: 28px;
   height: 1px;
   background: linear-gradient(90deg, transparent, #D0D0D0, transparent);
-  margin: 6px 0;
+  margin: 4px 0;
   flex: 0 0 auto;
 }
 
 /* Vertical Sliders */
 .vertical-slider-container {
-  width: 54px;
-  height: 90px;
+  width: 44px;
+  height: 70px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -199,8 +202,8 @@
 .vertical-slider {
   -webkit-appearance: none;
   appearance: none;
-  width: 70px;
-  height: 6px;
+  width: 55px;
+  height: 5px;
   background: transparent;
   border-radius: 3px;
   outline: none;
@@ -213,8 +216,8 @@
 .vertical-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   background: #FFFFFF;
   border: 2px solid #87B26B;
   border-radius: 50%;
@@ -230,8 +233,8 @@
 }
 
 .vertical-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   background: #FFFFFF;
   border: 2px solid #87B26B;
   border-radius: 50%;
@@ -241,14 +244,14 @@
 
 .vertical-slider::-webkit-slider-runnable-track {
   width: 100%;
-  height: 6px;
+  height: 5px;
   background: linear-gradient(to right, #87B26B 0%, #87B26B var(--slider-value, 50%), #E8E8E8 var(--slider-value, 50%), #E8E8E8 100%);
   border-radius: 3px;
 }
 
 .vertical-slider::-moz-range-track {
   width: 100%;
-  height: 6px;
+  height: 5px;
   background: linear-gradient(to right, #87B26B 0%, #87B26B var(--slider-value, 50%), #E8E8E8 var(--slider-value, 50%), #E8E8E8 100%);
   border-radius: 3px;
   border: none;
@@ -258,7 +261,15 @@
 .vertical-tools {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+/* Undo/Redo Tools */
+.undo-redo-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   margin-top: auto;
   flex: 0 0 auto;
 }
@@ -267,19 +278,19 @@
   background-color: #F5F5F5;
   border: none;
   padding: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
+  width: 42px;
+  height: 42px;
 }
 
 .vertical-tool-btn img {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   filter: invert(30%);
   transition: filter 0.2s ease;
 }
@@ -311,10 +322,10 @@
 /* Color Indicator on Pen Button */
 .color-indicator {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
-  width: 14px;
-  height: 14px;
+  bottom: 3px;
+  right: 3px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.95);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -330,7 +341,7 @@
 /* Pen Color Panel - Expands to the right */
 .pen-color-panel {
   position: absolute;
-  left: 62px;
+  left: 52px;
   top: 50%;
   transform: translateY(-50%);
   background: linear-gradient(180deg, #FFFFFF 0%, #F8F9FA 100%);
@@ -442,11 +453,11 @@
   border-color: #343A40;
 }
 
-/* Right Bottom Buttons - Above Bottom Toolbar */
+/* Left Bottom Buttons - Below Chat Panel */
 .right-bottom-buttons {
   position: absolute;
   bottom: 16px;
-  right: 20px;
+  left: 90px;           /* aligned with chat panel */
   display: flex;
   flex-direction: row;
   gap: 12px;
@@ -505,6 +516,21 @@
   background-color: #6fa054;
 }
 
+/* AI Toggle Button */
+.bottom-tool-btn.ai-toggle-btn {
+  background-color: #87B26B;
+  width: 48px;
+  height: 48px;
+}
+
+.bottom-tool-btn.ai-toggle-btn img {
+  filter: brightness(0) invert(1);
+}
+
+.bottom-tool-btn.ai-toggle-btn:hover {
+  background-color: #6fa054;
+}
+
 /* Recording state for microphone button */
 .bottom-tool-btn.microphone-btn.recording {
   background-color: #EA5851;
@@ -538,17 +564,17 @@
   }
 }
 
-/* Hint Text - displayed next to home button */
+/* Hint Text - displayed below canvas */
 .canvas-hint-text {
   position: absolute;
-  top: 20px;
-  left: 180px;
+  bottom: 20px;
+  left: 0;
+  right: 0;
   z-index: 25;
-  font-size: 8pt;
-  color: #999999;
+  font-size: 11pt;
+  color: #888888;
   font-style: italic;
-  text-align: left;
-  max-width: 500px;
+  text-align: center;
   padding: 12px 16px;
   pointer-events: none;
 }
@@ -557,15 +583,15 @@
 .canvas-wrapper {
   position: absolute;
   top: 0;
-  left: 0;
+  left: 460px;          /* offset to avoid chat panel (90px sidebar + 360px panel + 10px gap) */
   right: 0;
   bottom: 0;
   background-color: #F5F5F5;
   overflow: hidden;
-  /* Center the canvas if it's smaller than the container */
+  /* Center the canvas in the remaining space */
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Base canvas: SVG template layer (non-erasable) */
@@ -912,7 +938,7 @@
 .chat-panel {
   position: absolute;
   top: 20px;
-  right: 20px;
+  left: 90px;          /* positioned to the right of left sidebar */
   bottom: 90px;        /* extended height for more chat space */
   width: 360px;
   background: rgba(255, 255, 255, 0.98);
@@ -1474,8 +1500,20 @@
     padding: 12px;
   }
   
+  .chat-panel {
+    left: 70px;
+  }
+  
+  .right-bottom-buttons {
+    left: 70px;
+  }
+  
   .canvas-wrapper {
-    padding: 30px 30px 100px 80px;
+    left: 380px;         /* 70px sidebar + 300px panel + 10px gap */
+  }
+  
+  .toolbar-center {
+    left: 380px;         /* aligned with canvas wrapper */
   }
   
   .drawing-canvas {
@@ -1498,8 +1536,21 @@
     padding: 8px;
   }
   
+  .chat-panel {
+    left: 60px;
+    width: 300px;
+  }
+  
+  .right-bottom-buttons {
+    left: 60px;
+  }
+  
   .canvas-wrapper {
-    padding: 20px 20px 100px 70px;
+    left: 370px;         /* 60px sidebar + 300px panel + 10px gap */
+  }
+  
+  .toolbar-center {
+    left: 370px;         /* aligned with canvas wrapper */
   }
   
   .bottom-toolbar {
