@@ -1,13 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import Canvas from './Canvas';
+import sessionStore from './sessionStore';
 
 function App() {
-  const [language, setLanguage] = useState('EN');
-  const [activeModule, setActiveModule] = useState(null);
+  const [language, setLanguage] = useState(() => sessionStore.load('language', 'EN'));
+  const [activeModule, setActiveModule] = useState(() => sessionStore.load('activeModule', null));
   const [activeNavItem, setActiveNavItem] = useState('Activity');
   const [showSource, setShowSource] = useState(false);
-  const [showCanvas, setShowCanvas] = useState(false);
+  const [showCanvas, setShowCanvas] = useState(() => sessionStore.load('showCanvas', false));
+
+  useEffect(() => {
+    sessionStore.save('language', language);
+  }, [language]);
+
+  useEffect(() => {
+    sessionStore.save('activeModule', activeModule);
+  }, [activeModule]);
+
+  useEffect(() => {
+    sessionStore.save('showCanvas', showCanvas);
+  }, [showCanvas]);
+
+  const handleCanvasClose = useCallback(() => {
+    setShowCanvas(false);
+    sessionStore.save('showCanvas', false);
+    sessionStore.save('canvasState', null);
+  }, []);
 
   const toggleLanguage = () => {
     setLanguage(language === 'EN' ? '中' : 'EN');
@@ -20,8 +39,8 @@ function App() {
       nameCN: '生命之树',
       time: '15min',
       timeCN: '15分钟',
-      descriptionEN: 'Uses a tree\'s parts to articulate their personal histories, skills, values, and future aspirations.',
-      descriptionCN: '用树的各部分表达个人经历、技能与未来愿景。',
+      descriptionEN: 'Use a tree idea to explore your roots,strengths, challenges, hopes, and future growth.',
+      descriptionCN: '把⾃⼰想成⼀棵树，了解你的过去、⼒量与未来的成⻓。',
       icon: '/element/tree2.svg'
     },
     {
@@ -125,7 +144,7 @@ function App() {
   ];
 
   if (showCanvas) {
-    return <Canvas language={language} onClose={() => setShowCanvas(false)} />;
+    return <Canvas language={language} onClose={handleCanvasClose} />;
   }
 
   return (
@@ -178,42 +197,46 @@ function App() {
                 <span>{language === 'EN' ? 'Back' : '返回'}</span>
               </button>
 
-              <div className="hero-card">
-                <img className="hero-main" src="/element/Template (Tree of Life).jpg" alt="Tree of Life" />
-              </div>
-
-              <div className="detail-toolbar">
-                <button className="source-button" onClick={() => setShowSource(true)}>
-                  <img src="/element/notebook.svg" alt="Source" />
-                  <span>{language === 'EN' ? 'Source' : '来源'}</span>
-                </button>
-              </div>
-
-              <div className="detail-header">
-                <div className="detail-title">
-                  {language === 'EN' ? 'Tree of Life' : '生命之树'}
+              <div className="detail-body">
+                <div className="hero-card">
+                  <img className="hero-main" src="/element/Template (Tree of Life).jpg" alt="Tree of Life" />
                 </div>
-                <div className="detail-time">{language === 'EN' ? '15min' : '15分钟'}</div>
-              </div>
 
-              <div className="detail-description">
-                {language === 'EN'
-                  ? 'The Tree of Life is a narrative-based metaphor therapy activity where a person draws a tree to represent their life story. Each part of the tree (roots, trunk, branches, leaves, fruits) symbolizes different aspects of self — such as origins, strengths, hopes, relationships, and contributions. By exploring and expanding these symbols, people can reflect on their identity, resources, and future possibilities in a safe, creative way.'
-                  : '生命之树是一种叙事实践的隐喻疗愈活动，人们通过绘制一棵树来表达自己的生命故事。树的各个部分（根、树干、枝叶、果实）象征着自我的不同方面，如来源、优势、希望、关系与贡献。通过探索并延展这些象征，人们可以在安全且富有创造力的方式中反思自我身份、资源与未来可能性。'}
-              </div>
+                <div className="detail-info">
+                  <div className="detail-toolbar">
+                    <button className="source-button" onClick={() => setShowSource(true)}>
+                      <img src="/element/notebook.svg" alt="Source" />
+                      <span>{language === 'EN' ? 'Source' : '来源'}</span>
+                    </button>
+                  </div>
 
-              <div className="detail-prep">
-                <div className="prep-title">{language === 'EN' ? 'Preparation:' : '准备：'}</div>
-                <div className="prep-item">
-                  <img src="/element/sofa.svg" alt="Preparation" />
-                  <span>{language === 'EN' ? 'Find a quiet space to focus on your emotions.' : '找一个安静的空间，专注于你的情绪。'}</span>
+                  <div className="detail-header">
+                    <div className="detail-title">
+                      {language === 'EN' ? 'Tree of Life' : '生命之树'}
+                    </div>
+                    <div className="detail-time">{language === 'EN' ? '15min' : '15分钟'}</div>
+                  </div>
+
+                  <div className="detail-description">
+                    {language === 'EN'
+                      ? 'The Tree of Life is a narrative-based metaphor therapy activity where a person draws a tree to represent their life story. Each part of the tree (roots, trunk, branches, leaves, fruits) symbolizes different aspects of self — such as origins, strengths, hopes, relationships, and contributions. By exploring and expanding these symbols, people can reflect on their identity, resources, and future possibilities in a safe, creative way.'
+                      : '这是⼀个⽤画画来讲⾃⼰故事的活动。你可以画⼀棵属于⾃⼰的树。树的不同部分代表你⽣活中的不同事情：根可以表示你的过去和来⾃哪⾥，树⼲表示你的⼒量和优点，树枝和树叶表示你的希望和梦想，果实可以表示你做过的好事或重要的收获。通过画这棵树，你可以更了解⾃⼰，也可以想⼀想未来想成为什么样的⼈。'}
+                  </div>
+
+                  <div className="detail-prep">
+                    <div className="prep-title">{language === 'EN' ? 'Preparation:' : '准备：'}</div>
+                    <div className="prep-item">
+                      <img src="/element/sofa.svg" alt="Preparation" />
+                      <span>{language === 'EN' ? 'Find a quiet space to focus on your emotions.' : '找⼀个安静、舒服的地⽅坐下来，慢慢把注意⼒放在⾃⼰当下的感受上。'}</span>
+                    </div>
+                  </div>
+
+                  <div className="detail-actions">
+                    <button className="start-button" onClick={() => setShowCanvas(true)}>
+                      {language === 'EN' ? 'Start' : '开始'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-              <div className="detail-actions">
-                <button className="start-button" onClick={() => setShowCanvas(true)}>
-                  {language === 'EN' ? 'Start' : '开始'}
-                </button>
               </div>
 
               {showSource && (

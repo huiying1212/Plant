@@ -24,25 +24,40 @@ body {
   top: 20px;
   right: 20px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Avenir', sans-serif;
-  font-weight: 400;
-  font-size: 14px;
+  font-weight: 500;
+  font-size: 18px;
   z-index: 100;
+  background: rgba(135, 178, 107, 0.12);
+  border: 1.5px solid rgba(135, 178, 107, 0.35);
+  border-radius: 24px;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .language-toggle span {
   color: #87B26B;
   cursor: pointer;
   transition: all 0.2s ease;
+  padding: 2px 6px;
+  border-radius: 14px;
+}
+
+.language-toggle span:hover {
+  background: rgba(135, 178, 107, 0.18);
 }
 
 .language-toggle span.active {
-  color: #87B26B;
-  font-weight: 600;
+  color: #fff;
+  font-weight: 700;
+  background: #87B26B;
 }
 
 .language-toggle .separator {
-  color: #87B26B;
+  color: rgba(135, 178, 107, 0.5);
   cursor: default;
+  font-size: 16px;
 }
 
 /* Main Container */
@@ -107,7 +122,25 @@ body {
 
 /* Detail View */
 .detail-view {
-  max-width: 720px;
+  max-width: 960px;
+}
+
+.detail-body {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+.detail-body .hero-card {
+  flex: 0 0 420px;
+  margin-bottom: 0;
+}
+
+.detail-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .back-button {
@@ -155,7 +188,7 @@ body {
 
 .detail-toolbar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   margin-bottom: 16px;
 }
 
@@ -223,7 +256,8 @@ body {
 }
 
 .detail-actions {
-  margin-top: 16px;
+  margin-top: auto;
+  padding-top: 20px;
 }
 
 .start-button {
@@ -477,6 +511,15 @@ body {
 }
 
 @media (max-width: 768px) {
+  .detail-body {
+    flex-direction: column;
+  }
+
+  .detail-body .hero-card {
+    flex: unset;
+    width: 100%;
+  }
+
   .main-container {
     flex-direction: column;
   }

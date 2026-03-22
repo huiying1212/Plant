@@ -3,8 +3,11 @@ import './Canvas.css';
 import llmService from './llmService';
 import ttsService from './ttsService';
 import sttService from './sttService';
+import sessionStore from './sessionStore';
 
 function Canvas({ language, onClose }) {
+  const saved = useRef(sessionStore.load('canvasState', null)).current;
+
   const canvasRef = useRef(null);  // Top layer: user drawing (erasable)
   const baseCanvasRef = useRef(null);  // Bottom layer: SVG template (non-erasable)
   const chatMessagesEndRef = useRef(null);
@@ -33,27 +36,28 @@ function Canvas({ language, onClose }) {
   const [isMicrophoneOn, setIsMicrophoneOn] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [chatPanelOpen, setChatPanelOpen] = useState(true);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(saved?.currentStep ?? 0);
   const [textInputValue, setTextInputValue] = useState('');
-  const [canvasTexts, setCanvasTexts] = useState([]);
+  const [canvasTexts, setCanvasTexts] = useState(saved?.canvasTexts ?? []);
   const [draggingTextIndex, setDraggingTextIndex] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [hoveringTextIndex, setHoveringTextIndex] = useState(null);
   const [tempTextIndex, setTempTextIndex] = useState(null); // Track temporary text that can be moved
-  const [brushStrokes, setBrushStrokes] = useState([]); // Store brush strokes separately
+  const [brushStrokes, setBrushStrokes] = useState(saved?.brushStrokes ?? []); // Store brush strokes separately
   const [currentStroke, setCurrentStroke] = useState(null); // Track current stroke being drawn
   const [history, setHistory] = useState([]);
   const [historyStep, setHistoryStep] = useState(0);
   const [redrawTrigger, setRedrawTrigger] = useState(0); // Trigger for baseCanvas redraw on undo/redo
   const [isUndoRedoInProgress, setIsUndoRedoInProgress] = useState(false); // Prevent rapid undo/redo clicks
-  const [isCompleted, setIsCompleted] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(saved?.isCompleted ?? false);
   const [rating, setRating] = useState(null);
-  const [hasSubmittedCurrentStep, setHasSubmittedCurrentStep] = useState(false);
+  const [hasSubmittedCurrentStep, setHasSubmittedCurrentStep] = useState(saved?.hasSubmittedCurrentStep ?? false);
   const [finalImageUrl, setFinalImageUrl] = useState(null); // Store the final tree image for download
   
-  // Tutorial state
+  // Tutorial state — skip tutorial on restore
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
+  const restoredFromSession = useRef(!!saved);
   
   // Tutorial steps configuration
   const tutorialSteps = useMemo(() => {
@@ -71,7 +75,7 @@ function Canvas({ language, onClose }) {
         position: 'bottom',
         titleEN: 'Progress',
         titleCN: '进度条',
-        descEN: 'Shows your current progress through the steps',
+        descEN: 'Shows your current step of the activity.',
         descCN: '显示当前步骤进度'
       },
       {
@@ -79,8 +83,8 @@ function Canvas({ language, onClose }) {
         position: 'right',
         titleEN: 'Drawing Tools',
         titleCN: '绘画工具栏',
-        descEN: 'Brush size, opacity, pen, fill, eraser, and text tools',
-        descCN: '笔刷大小、透明度、画笔、填充、橡皮擦和文字工具'
+        descEN: 'Brush Size, Brush Opacity, Pen, Fill Tool, Text Input Tool, Undo, Redo.',
+        descCN: '笔刷⼤⼩、笔刷透明度、画笔、填充⼯具、橡⽪擦、⽂字⼯具、撤销、重做。'
       },
       {
         targetSelector: '.chat-panel',
@@ -118,7 +122,7 @@ function Canvas({ language, onClose }) {
   }, []);
   
   // Chat-related state
-  const [chatMessages, setChatMessages] = useState([]);
+  const [chatMessages, setChatMessages] = useState(saved?.chatMessages ?? []);
   const [chatInput, setChatInput] = useState('');
   const [isLLMTyping, setIsLLMTyping] = useState(false);
 
@@ -254,6 +258,42 @@ function Canvas({ language, onClose }) {
   
   // Use ref to track if initial SVGs are drawn to avoid dependency issues
   const initialDrawnRef = useRef(false);
+
+  const getColoredSvgsStateSafe = () => {
+    const state = {};
+    Object.keys(coloredSvgsRef.current).forEach(key => {
+      const img = coloredSvgsRef.current[key];
+      if (img && img.src) {
+        state[key] = img.src;
+      }
+    });
+    return state;
+  };
+
+  // Persist critical Canvas state to sessionStorage on change
+  const persistTimer = useRef(null);
+  useEffect(() => {
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
+      const trimmedMessages = chatMessages.map(m => {
+        if (m.image && m.image.startsWith('data:')) {
+          return { ...m, image: undefined };
+        }
+        return m;
+      });
+      sessionStore.save('canvasState', {
+        currentStep,
+        chatMessages: trimmedMessages,
+        brushStrokes,
+        canvasTexts,
+        hasSubmittedCurrentStep,
+        isCompleted,
+        coloredSvgs: getColoredSvgsStateSafe(),
+      });
+    }, 400);
+    return () => { if (persistTimer.current) clearTimeout(persistTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, chatMessages, brushStrokes, canvasTexts, hasSubmittedCurrentStep, isCompleted]);
 
   // Store canvas dimensions for consistent sizing
   const canvasDimensionsRef = useRef({ width: 0, height: 0 });
@@ -410,8 +450,21 @@ function Canvas({ language, onClose }) {
           baseCtx.globalAlpha = 1.0;
           set2Drawn = true;
           initialDrawnRef.current = true;
-          // Save initial state to history (combine both canvases)
-          saveCanvasState();
+
+          // Restore colored SVGs and brush strokes from session if available
+          if (restoredFromSession.current && saved) {
+            const restoreSession = async () => {
+              if (saved.coloredSvgs && Object.keys(saved.coloredSvgs).length > 0) {
+                await restoreColoredSvgs(saved.coloredSvgs);
+                setRedrawTrigger(t => t + 1);
+              }
+            };
+            restoreSession();
+            restoredFromSession.current = false;
+          } else {
+            // Save initial state to history (combine both canvases)
+            saveCanvasState();
+          }
         }
       };
       
@@ -673,9 +726,13 @@ function Canvas({ language, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
 
-  // Initialize chat messages with first step guidance
+  // Initialize chat messages with first step guidance (skip if restored from session)
+  const chatInitialized = useRef(saved?.chatMessages?.length > 0);
   useEffect(() => {
-    // Add initial guidance when starting or language changes
+    if (chatInitialized.current) {
+      chatInitialized.current = false;
+      return;
+    }
     if (currentStep === 0) {
       const initialStepData = steps[0];
       const initialText = language === 'EN'
@@ -707,10 +764,14 @@ function Canvas({ language, onClose }) {
     }
   }, [isSpeakerOn]);
 
-  // Show tutorial when entering Tree of Life (Step 0)
+  // Show tutorial when entering Tree of Life (Step 0) — skip on session restore
+  const tutorialShownRef = useRef(!!saved);
   useEffect(() => {
+    if (tutorialShownRef.current) {
+      tutorialShownRef.current = false;
+      return;
+    }
     if (currentStep === 0) {
-      // Delay slightly to ensure all DOM elements are rendered
       const timer = setTimeout(() => {
         setShowTutorial(true);
         setTutorialStep(0);
@@ -2192,6 +2253,16 @@ function Canvas({ language, onClose }) {
             ))}
           </div>
         </div>
+
+        <div className="toolbar-right">
+          <button
+            className="toolbar-btn tutorial-reopen-btn"
+            onClick={() => { setTutorialStep(0); setShowTutorial(true); }}
+            title={language === 'EN' ? 'Reopen Tutorial' : '重新查看教程'}
+          >
+            ?
+          </button>
+        </div>
       </div>
 
       {/* Main Canvas Area */}
@@ -2200,10 +2271,8 @@ function Canvas({ language, onClose }) {
         <div className="left-sidebar">
           {/* Brush Size Slider */}
           <div className="slider-group">
-            <div className="slider-icon" title={language === 'EN' ? 'Brush Size' : '笔刷大小'}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r={Math.max(3, brushSize / 5)} fill="currentColor" />
-              </svg>
+            <div className="slider-icon slider-label" title={language === 'EN' ? 'Brush Size' : '笔刷大小'}>
+              {language === 'EN' ? 'Size' : '大小'}
             </div>
             <div className="vertical-slider-container">
               <input 
@@ -2222,10 +2291,8 @@ function Canvas({ language, onClose }) {
           
           {/* Opacity Slider */}
           <div className="slider-group">
-            <div className="slider-icon" title={language === 'EN' ? 'Opacity' : '透明度'}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" fill="currentColor" fillOpacity={brushOpacity / 100} />
-              </svg>
+            <div className="slider-icon slider-label" title={language === 'EN' ? 'Opacity' : '透明度'}>
+              {language === 'EN' ? 'Opacity' : '透明'}
             </div>
             <div className="vertical-slider-container">
               <input 
@@ -2259,7 +2326,7 @@ function Canvas({ language, onClose }) {
                     setIsColorPanelCollapsed(true);
                   }
                 }}
-                title={language === 'EN' ? 'Pen (click again to choose color)' : '画笔（再次点击选择颜色）'}
+                title={language === 'EN' ? 'Pen: Draw freely on the canvas. (click again to choose color)' : '画笔：在画布上⾃由绘画。（再次点击选择颜色）'}
               >
                 <img src="/element/brush.svg" alt="Pen" />
                 <div 
@@ -2315,7 +2382,7 @@ function Canvas({ language, onClose }) {
                     setIsColorPanelCollapsed(true);
                   }
                 }}
-                title={language === 'EN' ? 'Fill (click again to choose color)' : '填充（再次点击选择颜色）'}
+                title={language === 'EN' ? 'Fill Tool: Fill a closed area with color. (click again to choose color)' : '填充工具：给封闭的区域填充颜⾊。（再次点击选择颜色）'}
               >
                 <img src="/element/paint bucket.svg" alt="Fill" />
                 <div 
@@ -2362,6 +2429,8 @@ function Canvas({ language, onClose }) {
                 setCurrentTool('eraser');
                 setIsColorPanelCollapsed(true);
               }}
+              title={language === 'EN' ? 'Eraser' : '橡皮擦'}
+              
             >
               <img src="/element/eraser.svg" alt="Eraser" />
             </button>
@@ -2372,6 +2441,7 @@ function Canvas({ language, onClose }) {
                 setShowTextInput(true);
                 setIsColorPanelCollapsed(true);
               }}
+              title={language === 'EN' ? 'Text Input Tool: Type words and place them anywhere on the canvas. You can drag the text box to move it.' : '⽂字⼯具：输⼊⽂字，并把⽂字拖动到画布的任意位置。'}
             >
               <img src="/element/keyboard.svg" alt="Text" />
             </button>
@@ -2721,7 +2791,7 @@ function Canvas({ language, onClose }) {
       {/* Tutorial Overlay */}
       {showTutorial && (
         <div className="tutorial-overlay">
-          <div className="tutorial-backdrop" onClick={() => setShowTutorial(false)} />
+          <div className="tutorial-backdrop" />
           
           {/* Tutorial Highlight and Tooltip */}
           <TutorialHighlight

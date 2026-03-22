@@ -162,13 +162,24 @@
 }
 
 .slider-icon {
-  width: 18px;
-  height: 18px;
+  width: auto;
+  min-width: 18px;
+  height: auto;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #888;
   transition: color 0.2s ease;
+}
+
+.slider-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-align: center;
+  padding: 2px 0;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .slider-icon svg {
@@ -1757,4 +1768,3 @@
   color: #6B7B5B;
   text-decoration: underline;
 }
-
