@@ -824,14 +824,12 @@ function Canvas({ language, onClose }) {
     }
   }, [isSpeakerOn]);
 
-  // Show tutorial when entering Tree of Life (Step 0) — skip on session restore
+  // Show tutorial once on first entry to Step 0 — skip on session restore or back-navigation
   const tutorialShownRef = useRef(!!saved);
   useEffect(() => {
-    if (tutorialShownRef.current) {
-      tutorialShownRef.current = false;
-      return;
-    }
+    if (tutorialShownRef.current) return;
     if (currentStep === 0) {
+      tutorialShownRef.current = true;
       const timer = setTimeout(() => {
         setShowTutorial(true);
         setTutorialStep(0);
