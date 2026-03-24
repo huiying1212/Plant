@@ -83,7 +83,7 @@ function Canvas({ language, onClose }) {
         position: 'right',
         titleEN: 'Drawing Tools',
         titleCN: '绘画工具栏',
-        descEN: 'Brush Size, Brush Opacity, Pen, Fill Tool, Text Input Tool, Undo, Redo.',
+        descEN: 'Brush Size, Brush Opacity, Pen, Fill Tool, Eraser, Text Input Tool, Undo, Redo.',
         descCN: '笔刷⼤⼩、笔刷透明度、画笔、填充⼯具、橡⽪擦、⽂字⼯具、撤销、重做。'
       },
       {
@@ -125,6 +125,54 @@ function Canvas({ language, onClose }) {
   const [chatMessages, setChatMessages] = useState(saved?.chatMessages ?? []);
   const [chatInput, setChatInput] = useState('');
   const [isLLMTyping, setIsLLMTyping] = useState(false);
+
+  const shouldWarnBeforeExit = !isCompleted && (
+    currentStep > 0 ||
+    brushStrokes.length > 0 ||
+    canvasTexts.length > 0 ||
+    hasSubmittedCurrentStep
+  );
+
+  const getExitWarningMessage = () => (
+    language === 'EN'
+      ? 'You have unfinished progress. Are you sure you want to leave?'
+      : '你还有未完成的进度，确定要离开吗？'
+  );
+
+  const handleAttemptExit = () => {
+    if (shouldWarnBeforeExit && !window.confirm(getExitWarningMessage())) {
+      return;
+    }
+    onClose();
+  };
+
+  const goToStep = (targetStep) => {
+    if (targetStep === currentStep || targetStep > currentStep || targetStep < 0) return;
+    if (isLLMTyping) return;
+
+    const targetStepData = steps[targetStep];
+    const label = language === 'EN' ? targetStepData.titleEN : targetStepData.titleCN;
+
+    const navMessage = {
+      sender: 'system',
+      text: language === 'EN'
+        ? `━━━ Returned to: ${label} ━━━`
+        : `━━━ 返回到：${label} ━━━`,
+      timestamp: new Date().toISOString()
+    };
+
+    const reminderMessage = {
+      sender: 'bot',
+      text: language === 'EN'
+        ? `You're back at the ${label} step. Feel free to continue editing, then click "Submit Drawing" when you're ready.`
+        : `你回到了${label}步骤。请继续编辑，完成后点击"提交绘画"。`,
+      timestamp: new Date().toISOString()
+    };
+
+    setChatMessages(prev => [...prev, navMessage, reminderMessage]);
+    setCurrentStep(targetStep);
+    setHasSubmittedCurrentStep(false);
+  };
 
   const colorPalette = [
     // Row 1: Warm to cool spectrum
@@ -294,6 +342,18 @@ function Canvas({ language, onClose }) {
     return () => { if (persistTimer.current) clearTimeout(persistTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, chatMessages, brushStrokes, canvasTexts, hasSubmittedCurrentStep, isCompleted]);
+
+  // Browser-level confirmation when user attempts to close/reload tab.
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (!shouldWarnBeforeExit) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [shouldWarnBeforeExit]);
 
   // Store canvas dimensions for consistent sizing
   const canvasDimensionsRef = useRef({ width: 0, height: 0 });
@@ -812,6 +872,41 @@ function Canvas({ language, onClose }) {
     });
   };
 
+  const MAX_TEXT_WIDTH = 150;
+
+  const wrapText = (ctx, text, maxWidth) => {
+    const lines = [];
+    let currentLine = '';
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const testLine = currentLine + char;
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth && currentLine.length > 0) {
+        lines.push(currentLine);
+        currentLine = char;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+    return lines;
+  };
+
+  const getWrappedTextSize = (ctx, textObj) => {
+    ctx.font = `${textObj.fontSize || 16}px Avenir, sans-serif`;
+    const lines = wrapText(ctx, textObj.text, MAX_TEXT_WIDTH);
+    const lineHeight = (textObj.fontSize || 16) * 1.3;
+    const height = lines.length * lineHeight;
+    let width = 0;
+    for (const line of lines) {
+      const w = ctx.measureText(line).width;
+      if (w > width) width = w;
+    }
+    return { width, height, lines, lineHeight };
+  };
+
   // Function to redraw canvas with base content, brush strokes, and texts
   const redrawCanvasWithTexts = () => {
     const canvas = canvasRef.current;
@@ -831,7 +926,10 @@ function Canvas({ language, onClose }) {
       ctx.font = `${textObj.fontSize || 16}px Avenir, sans-serif`;
       ctx.fillStyle = textObj.color;
       ctx.textBaseline = 'top';
-      ctx.fillText(textObj.text, textObj.x, textObj.y);
+      const { lines, lineHeight } = getWrappedTextSize(ctx, textObj);
+      lines.forEach((line, idx) => {
+        ctx.fillText(line, textObj.x, textObj.y + idx * lineHeight);
+      });
     });
   };
 
@@ -1595,10 +1693,7 @@ function Canvas({ language, onClose }) {
     
     for (let i = canvasTexts.length - 1; i >= 0; i--) {
       const textObj = canvasTexts[i];
-      ctx.font = `${textObj.fontSize || 16}px Avenir, sans-serif`;
-      const metrics = ctx.measureText(textObj.text);
-      const textWidth = metrics.width;
-      const textHeight = textObj.fontSize || 16;
+      const { width: textWidth, height: textHeight } = getWrappedTextSize(ctx, textObj);
       
       if (x >= textObj.x && x <= textObj.x + textWidth &&
           y >= textObj.y && y <= textObj.y + textHeight) {
@@ -1686,13 +1781,9 @@ function Canvas({ language, onClose }) {
       
       for (let i = canvasTexts.length - 1; i >= 0; i--) {
         const textObj = canvasTexts[i];
-        // Only allow hovering on temporary text
         if (!textObj.isTemporary) continue;
         
-        ctx.font = `${textObj.fontSize || 16}px Avenir, sans-serif`;
-        const metrics = ctx.measureText(textObj.text);
-        const textWidth = metrics.width;
-        const textHeight = textObj.fontSize || 16;
+        const { width: textWidth, height: textHeight } = getWrappedTextSize(ctx, textObj);
         
         if (x >= textObj.x && x <= textObj.x + textWidth &&
             y >= textObj.y && y <= textObj.y + textHeight) {
@@ -2154,7 +2245,7 @@ function Canvas({ language, onClose }) {
 
   // Return to home page
   const handleFinish = () => {
-    onClose();
+    handleAttemptExit();
   };
 
   if (isCompleted) {
@@ -2237,7 +2328,7 @@ function Canvas({ language, onClose }) {
       {/* Top Toolbar */}
       <div className="canvas-toolbar">
         <div className="toolbar-left">
-          <button className="toolbar-btn home-btn" onClick={onClose}>
+          <button className="toolbar-btn home-btn" onClick={handleAttemptExit}>
             <img src="/element/home.svg" alt="Home" />
           </button>
         </div>
@@ -2248,7 +2339,13 @@ function Canvas({ language, onClose }) {
             {steps.map((_, idx) => (
               <div 
                 key={idx} 
-                className={`progress-dash ${idx <= currentStep ? 'completed' : 'remaining'}`}
+                className={`progress-dash ${idx === currentStep ? 'active' : idx < currentStep ? 'completed clickable' : 'remaining'}`}
+                onClick={() => idx < currentStep && goToStep(idx)}
+                title={idx < currentStep
+                  ? (language === 'EN'
+                    ? `Go back to: ${steps[idx].titleEN}`
+                    : `返回到：${steps[idx].titleCN}`)
+                  : undefined}
               />
             ))}
           </div>
@@ -2271,7 +2368,7 @@ function Canvas({ language, onClose }) {
         <div className="left-sidebar">
           {/* Brush Size Slider */}
           <div className="slider-group">
-            <div className="slider-icon slider-label" title={language === 'EN' ? 'Brush Size' : '笔刷大小'}>
+            <div className="slider-icon slider-label" title={language === 'EN' ? 'Brush/Eraser Size' : '笔刷/橡皮擦大小'}>
               {language === 'EN' ? 'Size' : '大小'}
             </div>
             <div className="vertical-slider-container">
@@ -2520,13 +2617,11 @@ function Canvas({ language, onClose }) {
           )}
 
           {/* Hint Text - Below canvas */}
-          {currentStep >= 1 && (
-            <div className="canvas-hint-text">
-              {language === 'EN' 
-                ? 'This is your tree of life, you may draw beyond the lines or reshape the tree.'
-                : '这是你的生命之树。你可以画出轮廓之外，或重新塑造这棵树。'}
-            </div>
-          )}
+          <div className="canvas-hint-text">
+            {language === 'EN' 
+              ? 'Draw, color, and add text here to create your tree. A tree template is available, but you can design your tree in any way you like.'
+              : '在这里绘制你的生命之树，可参考模板或自由创作。'}
+          </div>
         </div>
 
 
@@ -2721,6 +2816,7 @@ function Canvas({ language, onClose }) {
             className="chat-panel-close-btn"
             onClick={() => setChatPanelOpen(false)}
             aria-label={language === 'EN' ? 'Hide guidance' : '收起指南'}
+            title={language === 'EN' ? 'The chat window could be closed and reopened anytime.' : '聊天窗口可以随时被关闭，也可以重新打开。'}
           >
             <img src="/element/hide.svg" alt="Hide" />
           </button>

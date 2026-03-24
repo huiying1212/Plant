@@ -113,6 +113,21 @@
   border: none;
 }
 
+.progress-dash.completed.clickable {
+  cursor: pointer;
+}
+
+.progress-dash.completed.clickable:hover {
+  background-color: #6E9A52;
+  transform: scaleY(2);
+}
+
+.progress-dash.active {
+  background-color: #87B26B;
+  border: none;
+  box-shadow: 0 0 0 2px rgba(135, 178, 107, 0.45);
+}
+
 .progress-dash.remaining {
   background: repeating-linear-gradient(
     to right,
