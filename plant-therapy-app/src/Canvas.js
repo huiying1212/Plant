@@ -79,12 +79,36 @@ function Canvas({ language, onClose }) {
         descCN: '显示当前步骤进度'
       },
       {
-        targetSelector: '.left-sidebar',
+        targetSelector: '.brush-size-group',
+        position: 'right',
+        titleEN: 'Brush Size',
+        titleCN: '笔刷大小',
+        descEN: 'Drag the slider up or down to adjust the brush or eraser size.',
+        descCN: '上下拖动滑块，调整画笔或橡皮擦的大小。'
+      },
+      {
+        targetSelector: '.brush-opacity-group',
+        position: 'right',
+        titleEN: 'Brush Opacity',
+        titleCN: '笔刷透明度',
+        descEN: 'Drag the slider to change how transparent your brush strokes are.',
+        descCN: '拖动滑块，调整画笔描边的透明度。'
+      },
+      {
+        targetSelector: '.vertical-tools',
         position: 'right',
         titleEN: 'Drawing Tools',
-        titleCN: '绘画工具栏',
-        descEN: 'Brush Size, Brush Opacity, Pen, Fill Tool, Eraser, Text Input Tool, Undo, Redo.',
-        descCN: '笔刷⼤⼩、笔刷透明度、画笔、填充⼯具、橡⽪擦、⽂字⼯具、撤销、重做。'
+        titleCN: '绘画工具',
+        descEN: 'Choose your tool: Pen to draw freely, Fill to colour areas, Eraser to remove strokes, or Text to add words.',
+        descCN: '选择工具：画笔自由绘画、填充涂色、橡皮擦清除笔迹，或文字工具添加文字。'
+      },
+      {
+        targetSelector: '.undo-redo-tools',
+        position: 'right',
+        titleEN: 'Undo & Redo',
+        titleCN: '撤销与重做',
+        descEN: 'Made a mistake? Use Undo to go back a step, or Redo to restore what you undid.',
+        descCN: '画错了？点击撤销返回上一步，或点击重做恢复撤销的内容。'
       },
       {
         targetSelector: '.chat-panel',
@@ -93,6 +117,14 @@ function Canvas({ language, onClose }) {
         titleCN: '聊天浮窗',
         descEN: 'Get guidance and chat with AI assistant',
         descCN: '获取指导并与AI助手聊天'
+      },
+      {
+        targetSelector: '.chat-panel-close-btn',
+        position: 'left',
+        titleEN: 'Hide / Show Chat',
+        titleCN: '收起 / 展开聊天窗',
+        descEN: 'The chat window could be closed and reopened anytime.',
+        descCN: '聊天窗口可以随时被关闭，也可以重新打开。'
       },
       {
         targetSelector: '.next-step-btn-floating',
@@ -2365,7 +2397,7 @@ function Canvas({ language, onClose }) {
         {/* Left Sidebar - Vertical Sliders and Tools */}
         <div className="left-sidebar">
           {/* Brush Size Slider */}
-          <div className="slider-group">
+          <div className="slider-group brush-size-group">
             <div className="slider-icon slider-label" title={language === 'EN' ? 'Brush/Eraser Size' : '笔刷/橡皮擦大小'}>
               {language === 'EN' ? 'Size' : '大小'}
             </div>
@@ -2385,7 +2417,7 @@ function Canvas({ language, onClose }) {
           </div>
           
           {/* Opacity Slider */}
-          <div className="slider-group">
+          <div className="slider-group brush-opacity-group">
             <div className="slider-icon slider-label" title={language === 'EN' ? 'Opacity' : '透明度'}>
               {language === 'EN' ? 'Opacity' : '透明'}
             </div>
