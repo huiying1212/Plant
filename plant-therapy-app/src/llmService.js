@@ -12,7 +12,7 @@ class LLMService {
     this.apiKey = process.env.REACT_APP_OPENAI_API_KEY || '';
     this.apiEndpoint = this.useProxy ? '/api/chat' : 'https://api.openai.com/v1/responses';
     // Use gpt-4o by default as it supports vision
-    this.model = process.env.REACT_APP_OPENAI_MODEL || 'gpt-4o-mini';
+    this.model = process.env.REACT_APP_OPENAI_MODEL || 'ft:gpt-4.1-2025-04-14:aideal:tree-of-life:DY4kho64';
     
     // RAG Configuration
     // Vector Store ID for Plant Metaphor Database knowledge base

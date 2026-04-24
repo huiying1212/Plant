@@ -53,6 +53,18 @@ function Canvas({ language, onClose }) {
   const [rating, setRating] = useState(null);
   const [hasSubmittedCurrentStep, setHasSubmittedCurrentStep] = useState(saved?.hasSubmittedCurrentStep ?? false);
   const [finalImageUrl, setFinalImageUrl] = useState(null); // Store the final tree image for download
+  // Track drawing activity per step: baseline counts when entering each step.
+  // Restore baseline from saved state so the user's existing qualifying work
+  // (strokes/texts/fill) is still recognised as "new for this step" after a refresh.
+  const stepBaselineRef = useRef(
+    saved?.stepBaseline
+      ? {
+          strokeCount: saved.stepBaseline.strokeCount ?? 0,
+          textCount: saved.stepBaseline.textCount ?? 0,
+          hasFill: !!saved.stepBaseline.hasFill
+        }
+      : { strokeCount: 0, textCount: 0, hasFill: false }
+  );
   
   // Tutorial state — skip tutorial on restore
   const [showTutorial, setShowTutorial] = useState(false);
@@ -204,6 +216,7 @@ function Canvas({ language, onClose }) {
     setChatMessages(prev => [...prev, navMessage, reminderMessage]);
     setCurrentStep(targetStep);
     setHasSubmittedCurrentStep(false);
+    stepBaselineRef.current = { strokeCount: brushStrokes.length, textCount: canvasTexts.length, hasFill: false };
   };
 
   const colorPalette = [
@@ -369,6 +382,7 @@ function Canvas({ language, onClose }) {
         hasSubmittedCurrentStep,
         isCompleted,
         coloredSvgs: getColoredSvgsStateSafe(),
+        stepBaseline: stepBaselineRef.current,
       });
     }, 400);
     return () => { if (persistTimer.current) clearTimeout(persistTimer.current); };
@@ -475,16 +489,6 @@ function Canvas({ language, onClose }) {
       const startX = centerX + offsetX;
       const startY = centerY;
       
-      // Load back.svg (always at the bottom)
-      const backImg = new Image();
-      backImg.onload = () => {
-        backSvgRef.current = backImg;
-      };
-      backImg.onerror = (error) => {
-        console.error('Error loading back.svg:', error);
-      };
-      backImg.src = '/canvas/2/back.svg';
-      
       // Preload set 1 (public/canvas/1/English) for step-by-step reveal
       let loadedCountSet1 = 0;
       const svgImagesSet1 = [];
@@ -493,9 +497,28 @@ function Canvas({ language, onClose }) {
       let loadedCountSet2 = 0;
       const svgImagesSet2 = [];
       let set2Drawn = false; // Ensure we only draw once
+      // Track back.svg load state so drawSet2SVGs can wait for it, otherwise back
+      // might be missing on first render when back.svg resolves after set 2 SVGs.
+      let backLoaded = false;
+      
+      // Load back.svg (always at the bottom)
+      const backImg = new Image();
+      backImg.onload = () => {
+        backSvgRef.current = backImg;
+        backLoaded = true;
+        drawSet2SVGs();
+      };
+      backImg.onerror = (error) => {
+        console.error('Error loading back.svg:', error);
+        backLoaded = true;
+        drawSet2SVGs();
+      };
+      backImg.src = '/canvas/2/back.svg';
       
       const drawSet2SVGs = () => {
         if (set2Drawn) return;
+        // Wait for back.svg load/error to resolve so it's guaranteed to be drawn
+        if (!backLoaded) return;
         
         // Ensure all set 2 images are loaded
         const allLoadedSet2 = svgImagesSet2.every((img) => img && img.complete);
@@ -796,14 +819,15 @@ function Canvas({ language, onClose }) {
     // Draw the high-res temp canvas at display size (baseCtx is already scaled)
     baseCtx.drawImage(tempCanvas, 0, 0, displayWidth, displayHeight);
     
-    // Get the user canvas context for redrawing brush strokes
+    // Reset user canvas drawing context state
     const ctx = canvas.getContext('2d');
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
     
-    // Clear and redraw all brush strokes on the USER canvas (top layer)
-    ctx.clearRect(0, 0, displayWidth, displayHeight);
-    redrawBrushStrokes(ctx);
+    // Redraw the USER canvas (top layer) including both brush strokes and text labels.
+    // Using redrawCanvasWithTexts ensures text labels are not wiped out when the base
+    // canvas is redrawn due to step/language/undo-redo changes.
+    redrawCanvasWithTexts();
     
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, steps, redrawTrigger]);
@@ -1633,6 +1657,7 @@ function Canvas({ language, onClose }) {
       // Use high quality PNG format
       coloredSvg.src = tempCanvas.toDataURL('image/png', 1.0);
       coloredSvgsRef.current[currentSvgIndex] = coloredSvg;
+      stepBaselineRef.current = { ...stepBaselineRef.current, hasFill: true };
       
       // Draw bugs SVG on top of everything (but below brush strokes)
       if (svgImagesSet2 && svgImagesSet2[bugsIndex]) {
@@ -1699,13 +1724,9 @@ function Canvas({ language, onClose }) {
         ctx.globalAlpha = 1.0;
       }
       
-      // Redraw brush strokes on the USER canvas (top layer)
-      const userCanvas = canvasRef.current;
-      if (userCanvas) {
-        const userCtx = userCanvas.getContext('2d');
-        userCtx.clearRect(0, 0, displayWidth, displayHeight);
-        redrawBrushStrokes(userCtx);
-      }
+      // Redraw the USER canvas (top layer) including both brush strokes and text labels,
+      // otherwise previously added text labels would disappear after a fill action.
+      redrawCanvasWithTexts();
       
       saveToHistory();
     }
@@ -2038,6 +2059,7 @@ function Canvas({ language, onClose }) {
       setChatMessages(prevMessages => [...prevMessages, ...messages]);
       setCurrentStep(currentStep + 1);
       setHasSubmittedCurrentStep(false);
+      stepBaselineRef.current = { strokeCount: brushStrokes.length, textCount: canvasTexts.length, hasFill: false };
       
       // If speaker is on, play the instruction as speech (don't block on this)
       if (isSpeakerOn) {
@@ -2055,6 +2077,25 @@ function Canvas({ language, onClose }) {
     
     // For drawing steps (1-7), require submission before proceeding
     if (!hasSubmittedCurrentStep && currentStep > 0) {
+      // Check if user has actually drawn anything in this step
+      const baseline = stepBaselineRef.current;
+      const hasNewStrokes = brushStrokes.length > baseline.strokeCount;
+      const hasNewTexts = canvasTexts.length > baseline.textCount;
+      const hasNewFill = baseline.hasFill;
+      const hasAnyDrawing = hasNewStrokes || hasNewTexts || hasNewFill;
+
+      if (!hasAnyDrawing) {
+        const promptMessage = {
+          sender: 'bot',
+          text: language === 'EN'
+            ? "It looks like you haven't drawn anything yet for this step. Try adding some colours, strokes, or text to your tree before submitting!"
+            : '看起来你还没有在这个步骤中画任何内容。请先在画布上涂色、画笔或添加文字，再提交哦！',
+          timestamp: new Date().toISOString()
+        };
+        setChatMessages(prev => [...prev, promptMessage]);
+        return;
+      }
+
       // First click: Save and submit drawing to GPT
       // Get combined canvas (base SVG + user drawing) for submission
       const canvasDataUrl = getCombinedCanvasDataUrl();
@@ -2235,6 +2276,7 @@ function Canvas({ language, onClose }) {
           setChatMessages(prevMessages => [...prevMessages, ...messages]);
           setCurrentStep(currentStep + 1);
           setHasSubmittedCurrentStep(false);
+          stepBaselineRef.current = { strokeCount: brushStrokes.length, textCount: canvasTexts.length, hasFill: false };
           
           // If speaker is on, play the instruction as speech (don't block on this)
           if (isSpeakerOn) {
@@ -2701,6 +2743,7 @@ function Canvas({ language, onClose }) {
               className="next-step-btn-floating reedit-btn"
               onClick={() => {
                 setHasSubmittedCurrentStep(false);
+                stepBaselineRef.current = { strokeCount: brushStrokes.length, textCount: canvasTexts.length, hasFill: false };
                 // Add a message to chat informing the user they can now re-edit
                 const reeditMessage = {
                   sender: 'bot',
