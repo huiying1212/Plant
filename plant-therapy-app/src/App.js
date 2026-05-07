@@ -24,7 +24,8 @@ function App() {
 
   const handleCanvasClose = useCallback(() => {
     setShowCanvas(false);
-    sessionStore.save('showCanvas', false);
+    // The `showCanvas` effect above already persists the flag — here we only
+    // need to clear the (potentially large) canvasState snapshot.
     sessionStore.save('canvasState', null);
   }, []);
 

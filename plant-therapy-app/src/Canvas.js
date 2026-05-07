@@ -202,7 +202,8 @@ function Canvas({ language, onClose }) {
       text: language === 'EN'
         ? `━━━ Returned to: ${label} ━━━`
         : `━━━ 返回到：${label} ━━━`,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      isStepUI: true
     };
 
     const reminderMessage = {
@@ -210,7 +211,8 @@ function Canvas({ language, onClose }) {
       text: language === 'EN'
         ? `You're back at the ${label} step. Feel free to continue editing, then click "Submit Drawing" when you're ready.`
         : `你回到了${label}步骤。请继续编辑，完成后点击"提交绘画"。`,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      isStepUI: true
     };
 
     setChatMessages(prev => [...prev, navMessage, reminderMessage]);
@@ -501,15 +503,20 @@ function Canvas({ language, onClose }) {
       // might be missing on first render when back.svg resolves after set 2 SVGs.
       let backLoaded = false;
       
-      // Load back.svg (always at the bottom)
+      // Try to load back.svg (the optional bottom-most background layer).
+      // It's expected to live at /canvas/2/back.svg, but the app still renders
+      // correctly without it — drawSet2SVGs() simply skips drawing the layer
+      // when backSvgRef.current is unset. Keep the failure quiet so a missing
+      // asset doesn't pollute the dev console with red errors on every mount.
       const backImg = new Image();
       backImg.onload = () => {
         backSvgRef.current = backImg;
         backLoaded = true;
         drawSet2SVGs();
       };
-      backImg.onerror = (error) => {
-        console.error('Error loading back.svg:', error);
+      backImg.onerror = () => {
+        console.info('[Canvas] back.svg not found — rendering without optional background layer.');
+        backSvgRef.current = null;
         backLoaded = true;
         drawSet2SVGs();
       };
@@ -858,7 +865,8 @@ function Canvas({ language, onClose }) {
         {
           sender: 'bot',
           text: initialText,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          isStepUI: true
         }
       ];
       setChatMessages(initialMessages);
@@ -1101,6 +1109,19 @@ function Canvas({ language, onClose }) {
     saveCanvasState(options);
   };
 
+  // Build the message list that should actually reach the LLM. We hide every
+  // chat bubble that the UI itself injected (welcome text, step separators,
+  // step instructions, "Example:" labels, error/transcribing/re-edit notices,
+  // etc). Sending those would (a) confuse the model with multiple consecutive
+  // assistant turns containing scripted UI text and (b) push the fine-tuned
+  // model toward hallucinated continuations of training-style dialog.
+  const buildLlmMessages = (messages) =>
+    messages.filter(msg =>
+      msg.sender !== 'hint' &&
+      msg.sender !== 'system' &&
+      !msg.isStepUI
+    );
+
   // Send message to LLM
   const sendChatMessage = async () => {
     if (!chatInput.trim() || isLLMTyping) return;
@@ -1118,8 +1139,8 @@ function Canvas({ language, onClose }) {
     setIsLLMTyping(true);
 
     try {
-      // Filter out hint messages before sending to LLM
-      const messagesForLLM = updatedMessages.filter(msg => msg.sender !== 'hint');
+      // Strip UI-only messages before sending to LLM
+      const messagesForLLM = buildLlmMessages(updatedMessages);
       // Get LLM response
       const llmResponse = await llmService.sendMessage(
         messagesForLLM,
@@ -1171,7 +1192,8 @@ function Canvas({ language, onClose }) {
       const errorMessage = {
         sender: 'bot',
         text: errorText,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        isStepUI: true
       };
       setChatMessages([...updatedMessages, errorMessage]);
       setIsLLMTyping(false);
@@ -1203,7 +1225,8 @@ function Canvas({ language, onClose }) {
         const transcribingMessage = {
           sender: 'system',
           text: language === 'EN' ? 'Transcribing audio...' : '正在转录音频...',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          isStepUI: true
         };
         setChatMessages(prev => [...prev, transcribingMessage]);
         
@@ -1226,8 +1249,8 @@ function Canvas({ language, onClose }) {
         setChatMessages(updatedMessages);
         setIsLLMTyping(true);
         
-        // Filter out hint messages before sending to LLM
-        const messagesForLLM = updatedMessages.filter(msg => msg.sender !== 'hint');
+        // Strip UI-only messages before sending to LLM
+        const messagesForLLM = buildLlmMessages(updatedMessages);
         // Get LLM response
         const llmResponse = await llmService.sendMessage(
           messagesForLLM,
@@ -1280,7 +1303,8 @@ function Canvas({ language, onClose }) {
         const errorMessage = {
           sender: 'bot',
           text: errorText,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          isStepUI: true
         };
         setChatMessages(prev => [...prev, errorMessage]);
       }
@@ -1313,7 +1337,8 @@ function Canvas({ language, onClose }) {
         const errorMessage = {
           sender: 'bot',
           text: errorText,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          isStepUI: true
         };
         setChatMessages(prev => [...prev, errorMessage]);
       }
@@ -2033,7 +2058,8 @@ function Canvas({ language, onClose }) {
         text: language === 'EN' 
           ? `━━━ ${nextStepData.titleEN} ━━━`
           : `━━━ ${nextStepData.titleCN} ━━━`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        isStepUI: true
       };
       
       const instructionMessage = {
@@ -2041,7 +2067,8 @@ function Canvas({ language, onClose }) {
         text: language === 'EN'
           ? `${nextStepData.instructionEN}\n\n${nextStepData.descriptionEN}`
           : `${nextStepData.instructionCN}\n\n${nextStepData.descriptionCN}`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        isStepUI: true
       };
       
       const messages = [stepTransitionMessage, instructionMessage];
@@ -2051,7 +2078,8 @@ function Canvas({ language, onClose }) {
           sender: 'bot',
           text: language === 'EN' ? 'Example:' : '示例：',
           timestamp: new Date().toISOString(),
-          image: nextStepData.exampleImage
+          image: nextStepData.exampleImage,
+          isStepUI: true
         };
         messages.push(exampleMessage);
       }
@@ -2090,7 +2118,8 @@ function Canvas({ language, onClose }) {
           text: language === 'EN'
             ? "It looks like you haven't drawn anything yet for this step. Try adding some colours, strokes, or text to your tree before submitting!"
             : '看起来你还没有在这个步骤中画任何内容。请先在画布上涂色、画笔或添加文字，再提交哦！',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          isStepUI: true
         };
         setChatMessages(prev => [...prev, promptMessage]);
         return;
@@ -2117,8 +2146,8 @@ function Canvas({ language, onClose }) {
         setIsLLMTyping(true);
         
         try {
-          // Filter out hint messages before sending to LLM
-          const messagesForLLM = updatedMessages.filter(msg => msg.sender !== 'hint');
+          // Strip UI-only messages before sending to LLM
+          const messagesForLLM = buildLlmMessages(updatedMessages);
           // Get LLM response about the drawing
           const llmResponse = await llmService.sendMessage(
             messagesForLLM,
@@ -2138,7 +2167,8 @@ function Canvas({ language, onClose }) {
             text: language === 'EN' 
               ? 'You can click “Next Step” at any time to end the current stage and enter the next one.'
               : '你可以随时点击“下一步”，结束当前阶段的探索并进入下一阶段。',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            isStepUI: true
           };
           
           setChatMessages([...updatedMessages, botMessage, hintMessage]);
@@ -2162,7 +2192,8 @@ function Canvas({ language, onClose }) {
           const errorMessage = {
             sender: 'bot',
             text: errorText,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            isStepUI: true
           };
           setChatMessages([...updatedMessages, errorMessage]);
           setIsLLMTyping(false);
@@ -2182,7 +2213,8 @@ function Canvas({ language, onClose }) {
           text: language === 'EN' 
             ? `━━━ ${nextStepData.titleEN} ━━━`
             : `━━━ ${nextStepData.titleCN} ━━━`,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          isStepUI: true
         };
         
         // Check if this is the summary step
@@ -2213,8 +2245,8 @@ function Canvas({ language, onClose }) {
           setIsLLMTyping(true);
           
           try {
-            // Filter out hint messages before sending to LLM
-            const messagesForLLM = updatedMessages.filter(msg => msg.sender !== 'hint');
+            // Strip UI-only messages before sending to LLM
+            const messagesForLLM = buildLlmMessages(updatedMessages);
             // Get LLM summary response
             const llmResponse = await llmService.sendMessage(
               messagesForLLM,
@@ -2246,7 +2278,8 @@ function Canvas({ language, onClose }) {
               text: language === 'EN' 
                 ? "I wasn't able to generate a reflection, but congratulations on completing your Tree of Life! Take a moment to appreciate the tree you've created."
                 : "我无法生成反思，但恭喜你完成了生命之树！花点时间欣赏你创造的这棵树吧。",
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
+              isStepUI: true
             };
             setChatMessages([...updatedMessages, errorMessage]);
             setIsLLMTyping(false);
@@ -2258,7 +2291,8 @@ function Canvas({ language, onClose }) {
             text: language === 'EN'
               ? `${nextStepData.instructionEN}\n\n${nextStepData.descriptionEN}`
               : `${nextStepData.instructionCN}\n\n${nextStepData.descriptionCN}`,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            isStepUI: true
           };
           
           const messages = [stepTransitionMessage, instructionMessage];
@@ -2268,7 +2302,8 @@ function Canvas({ language, onClose }) {
               sender: 'bot',
               text: language === 'EN' ? 'Example:' : '示例：',
               timestamp: new Date().toISOString(),
-              image: nextStepData.exampleImage
+              image: nextStepData.exampleImage,
+              isStepUI: true
             };
             messages.push(exampleMessage);
           }
@@ -2449,7 +2484,7 @@ function Canvas({ language, onClose }) {
                 min="1" 
                 max="50" 
                 value={brushSize} 
-                onChange={(e) => setBrushSize(e.target.value)}
+                onChange={(e) => setBrushSize(Number(e.target.value))}
                 className="vertical-slider"
                 style={{
                   '--slider-value': `${((brushSize - 1) / (50 - 1)) * 100}%`
@@ -2469,7 +2504,7 @@ function Canvas({ language, onClose }) {
                 min="0" 
                 max="100" 
                 value={brushOpacity} 
-                onChange={(e) => setBrushOpacity(e.target.value)}
+                onChange={(e) => setBrushOpacity(Number(e.target.value))}
                 className="vertical-slider"
                 style={{
                   '--slider-value': `${brushOpacity}%`
@@ -2514,7 +2549,7 @@ function Canvas({ language, onClose }) {
                       min="0" 
                       max="100" 
                       value={penBrightness} 
-                      onChange={(e) => handleBrightnessChange(e.target.value, 'pen')}
+                      onChange={(e) => handleBrightnessChange(Number(e.target.value), 'pen')}
                       className="horizontal-brightness-slider"
                       style={{
                         background: `linear-gradient(to right, #1a1a1a, ${penBaseColor}, #ffffff)`
@@ -2570,7 +2605,7 @@ function Canvas({ language, onClose }) {
                       min="0" 
                       max="100" 
                       value={fillBrightness} 
-                      onChange={(e) => handleBrightnessChange(e.target.value, 'fill')}
+                      onChange={(e) => handleBrightnessChange(Number(e.target.value), 'fill')}
                       className="horizontal-brightness-slider"
                       style={{
                         background: `linear-gradient(to right, #1a1a1a, ${fillBaseColor}, #ffffff)`
@@ -2750,7 +2785,8 @@ function Canvas({ language, onClose }) {
                   text: language === 'EN' 
                     ? 'Feel free to continue editing your drawing. Click "Submit Drawing" again when you\'re ready.'
                     : '请继续编辑你的绘画。完成后再次点击"提交绘画"。',
-                  timestamp: new Date().toISOString()
+                  timestamp: new Date().toISOString(),
+                  isStepUI: true
                 };
                 setChatMessages(prevMessages => [...prevMessages, reeditMessage]);
               }}

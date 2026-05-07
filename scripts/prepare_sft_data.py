@@ -390,9 +390,7 @@ def main():
         "holdout_source_segments": sum(len(r["segments"]) for r in holdout_records),
         "train_stage_distribution": dict(
             Counter(
-                [seg["stage"] for e in train_sources for seg in e["samples"]]
-                if False
-                else [s["stage"] for e in train_sources for s in e["samples"]]
+                s["stage"] for e in train_sources for s in e["samples"]
             )
         ),
         "holdout_langs": dict(Counter(e["lang"] for e in holdout_sources)),

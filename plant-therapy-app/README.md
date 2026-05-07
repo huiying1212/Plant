@@ -1,6 +1,6 @@
 # Plant Metaphor Therapy Module - React Homepage
 
-This React application implements the homepage for the Plant Metaphor Therapy Module, strictly following the design specifications from `Design (Home).pdf`.
+This React application implements the homepage for the Plant Metaphor Therapy Module.
 
 ## Features Implemented
 

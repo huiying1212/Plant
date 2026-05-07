@@ -11,8 +11,17 @@ class LLMService {
     this.useProxy = process.env.NODE_ENV === 'production';
     this.apiKey = process.env.REACT_APP_OPENAI_API_KEY || '';
     this.apiEndpoint = this.useProxy ? '/api/chat' : 'https://api.openai.com/v1/responses';
-    // Use gpt-4o by default as it supports vision
+    // Two models, picked dynamically per turn:
+    //   - `model` (fine-tuned) is specialised on therapy dialogs that ALWAYS
+    //     analyse a drawing. Used when the user has actually submitted an
+    //     image. Strong prior to mention colors/shapes/symbols on the canvas.
+    //   - `baseModel` is the same architecture without that prior, used for
+    //     text-only chit-chat (greetings, intro stage, follow-up questions
+    //     before any drawing exists). Without the FT prior it doesn't
+    //     fabricate drawings or claim the user "wrote family, friends,
+    //     classmates" before they actually drew anything.
     this.model = process.env.REACT_APP_OPENAI_MODEL || 'ft:gpt-4.1-2025-04-14:aideal:tree-of-life:DY4kho64';
+    this.baseModel = process.env.REACT_APP_OPENAI_BASE_MODEL || 'gpt-4.1-2025-04-14';
     
     // RAG Configuration
     // Vector Store ID for Plant Metaphor Database knowledge base
@@ -110,6 +119,26 @@ Current stage: {stage}`,
       throw new Error('API key is not configured. Please add REACT_APP_OPENAI_API_KEY to your .env.local file');
     }
 
+    // Detect whether ANY user turn in this conversation has actually submitted
+    // a drawing. The fine-tuned model was trained exclusively on dialogs where
+    // the user had drawn something, so when called with no image it confidently
+    // hallucinates ("I see you wrote family, friends, classmates...") even
+    // though the user has only typed "hi". Route those text-only turns to the
+    // base model — same system prompt, no FT prior — and only switch back to
+    // the FT model once a real image is in the history.
+    const userHasSubmittedImage = messages.some(
+      m => m.sender === 'user' && m.image
+    );
+    const effectiveModel = userHasSubmittedImage ? this.model : this.baseModel;
+    // RAG over plant metaphors only makes sense once we have something concrete
+    // to ground it in (a drawing). For pure greetings, skip it to keep replies
+    // fast and on-topic.
+    const effectiveUseRAG = this.useRAG && userHasSubmittedImage;
+    console.log(
+      `[LLM] turn routing: userHasSubmittedImage=${userHasSubmittedImage}, ` +
+      `model=${effectiveModel}, useRAG=${effectiveUseRAG}`
+    );
+
     try {
       const systemPrompt = this.getSystemPrompt(language, currentStep);
       
@@ -160,10 +189,10 @@ Current stage: {stage}`,
           },
           body: JSON.stringify({
             messages: allMessages,
-            requestedModel: this.model,
+            requestedModel: effectiveModel,
             temperature: 0.7,
             max_tokens: 500,
-            useRAG: this.useRAG  // Enable RAG mode
+            useRAG: effectiveUseRAG  // Only when user has submitted an image
           })
         });
 
@@ -182,7 +211,7 @@ Current stage: {stage}`,
       } else {
         // Direct API call (for local development)
         // Use Responses API with file search for RAG
-        if (this.useRAG) {
+        if (effectiveUseRAG) {
           console.log('Using Responses API with RAG for local development');
           
           // Extract system message
@@ -241,17 +270,21 @@ Current stage: {stage}`,
           }
 
           const requestBody = {
-            model: this.model,
+            model: effectiveModel,
             input,
             tools: [{
               type: 'file_search',
               vector_store_ids: [this.vectorStoreId],
-              max_num_results: 10
+              // Match the production proxy (api/chat.js) — 5 is enough context
+              // and keeps latency down. With 10 the model regularly ran out of
+              // its 500-token output budget after the search.
+              max_num_results: 5
             }],
-            // Force the model to use file_search tool
-            tool_choice: {
-              type: 'file_search'
-            },
+            // Let the model decide whether to search. Forcing file_search on
+            // every turn made the fine-tuned model fabricate drawing-related
+            // queries (e.g. "what does only blue mean to you?") even when the
+            // user only typed "hi" with nothing on the canvas yet.
+            tool_choice: 'auto',
             // Include search results in response for debugging/transparency
             include: ['file_search_call.results'],
             temperature: 0.7,
@@ -259,18 +292,30 @@ Current stage: {stage}`,
           };
 
           if (systemMessage) {
-            // Add explicit instruction to use knowledge base
             const baseInstructions = typeof systemMessage.content === 'string' 
               ? systemMessage.content 
               : systemMessage.content[0]?.text || '';
-            
+            // Encourage but don't *force* the knowledge base — same wording as
+            // the production proxy so dev and prod behave identically. The
+            // grounding clause is critical for the fine-tuned model: without
+            // it the model occasionally fabricated user statements ("you said
+            // you had a dog…") that match its training distribution but have
+            // no support in the actual conversation.
             requestBody.instructions = baseInstructions + `
 
-IMPORTANT: You MUST search the Plant Metaphor Database knowledge base for EVERY response. Look for:
-- Relevant plant metaphors that match the user's situation
-- Therapeutic techniques and prompts from the database
-- Specific plant imagery and symbolism that resonates with their experience
-Always incorporate the knowledge base content naturally in your responses.`;
+When the user has shared a drawing, image, or any concrete situation, search the
+Plant Metaphor Database knowledge base for relevant plant metaphors, therapeutic
+techniques, or symbolism, and weave them into your reply. For pure greetings or
+small talk where no context exists yet, respond warmly without forcing a search.
+
+GROUNDING — IMPORTANT:
+- Only refer to things the user has explicitly said in this conversation, or
+  visible content in an image they have submitted in this conversation.
+- Never invent, assume, or recall details that have not actually been shared
+  (no fabricated names, pets, family members, ages, hobbies, past events, or
+  prior statements). If you don't have information, ask an open question.
+- If you reference a part of the user's drawing, describe what is actually
+  visible in the most recent image, not generic tree imagery from training.`;
           }
 
           console.log('Responses API request:', JSON.stringify(requestBody, null, 2));
@@ -328,7 +373,7 @@ Always incorporate the knowledge base content naturally in your responses.`;
               'Authorization': `Bearer ${this.apiKey}`
             },
             body: JSON.stringify({
-              model: this.model,
+              model: effectiveModel,
               messages: allMessages,
               temperature: 0.7,
               max_tokens: 500

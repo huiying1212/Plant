@@ -18,15 +18,18 @@ class TTSService {
   }
 
   // Convert text to speech and return audio URL
-  async textToSpeech(text, voice = 'alloy', language = 'EN') {
+  // `voice` is optional — when omitted we pick a sensible default per language.
+  async textToSpeech(text, voice, language = 'EN') {
     // Check API key only if not using proxy
     if (!this.useProxy && !this.apiKey) {
       throw new Error('API key is not configured. Please add REACT_APP_OPENAI_API_KEY to your .env.local file');
     }
 
-    // Select appropriate voice based on language
+    // Select appropriate voice. Honour any caller-provided override so the
+    // function isn't silently throwing away the parameter, but fall back to a
+    // language-appropriate default when nothing was passed in.
     // alloy: neutral, echo: male, fable: British male, onyx: deep male, nova: female, shimmer: female
-    const selectedVoice = language === 'EN' ? 'nova' : 'shimmer'; // Use nova for English, shimmer for Chinese
+    const selectedVoice = voice || (language === 'EN' ? 'nova' : 'shimmer');
 
     try {
       let response;
@@ -87,8 +90,8 @@ class TTSService {
     console.log('[TTS] Use proxy:', this.useProxy);
     
     try {
-      // Generate audio URL
-      const audioUrl = await this.textToSpeech(text, 'alloy', language);
+      // Generate audio URL — let textToSpeech pick the language-appropriate voice
+      const audioUrl = await this.textToSpeech(text, undefined, language);
       console.log('[TTS] Audio URL generated successfully');
       
       // Add to queue

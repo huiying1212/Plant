@@ -186,11 +186,19 @@ async function handleRAGRequest(req, res, { apiKey, model, messages, temperature
     
     requestBody.instructions = baseInstructions + `
 
-IMPORTANT: You MUST search the Plant Metaphor Database knowledge base for EVERY response. Look for:
-- Relevant plant metaphors that match the user's situation
-- Therapeutic techniques and prompts from the database
-- Specific plant imagery and symbolism that resonates with their experience
-Always incorporate the knowledge base content naturally in your responses.`;
+When the user has shared a drawing, image, or any concrete situation, search the
+Plant Metaphor Database knowledge base for relevant plant metaphors, therapeutic
+techniques, or symbolism, and weave them into your reply. For pure greetings or
+small talk where no context exists yet, respond warmly without forcing a search.
+
+GROUNDING — IMPORTANT:
+- Only refer to things the user has explicitly said in this conversation, or
+  visible content in an image they have submitted in this conversation.
+- Never invent, assume, or recall details that have not actually been shared
+  (no fabricated names, pets, family members, ages, hobbies, past events, or
+  prior statements). If you don't have information, ask an open question.
+- If you reference a part of the user's drawing, describe what is actually
+  visible in the most recent image, not generic tree imagery from training.`;
   }
 
   console.log('RAG Request to Responses API:', JSON.stringify(requestBody, null, 2));

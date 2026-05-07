@@ -44,11 +44,25 @@ export default async function handler(req, res) {
       chunks.push(chunk);
     }
     const audioBuffer = Buffer.concat(chunks);
-    
+
+    // Honor the actual content type the browser produced (webm/opus, mp4, ...)
+    // rather than hard-coding webm — Safari for example records as audio/mp4.
+    const incomingType = req.headers['content-type'] || 'audio/webm';
+    const extension = incomingType.includes('mp4') ? 'mp4'
+      : incomingType.includes('mpeg') ? 'mp3'
+      : incomingType.includes('wav') ? 'wav'
+      : 'webm';
+
     // Create a blob and append to form data
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/webm' });
-    formData.append('file', audioBlob, 'audio.webm');
+    const audioBlob = new Blob([audioBuffer], { type: incomingType });
+    formData.append('file', audioBlob, `audio.${extension}`);
     formData.append('model', 'whisper-1');
+
+    // Forward the optional language hint (?language=en|zh) to Whisper
+    const language = typeof req.query?.language === 'string' ? req.query.language : '';
+    if (language) {
+      formData.append('language', language);
+    }
 
     // Call OpenAI Whisper API
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {

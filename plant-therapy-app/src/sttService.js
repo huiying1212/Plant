@@ -138,9 +138,15 @@ class STTService {
       let response;
       
       if (this.useProxy) {
-        // Use proxy endpoint (for Vercel production)
-        response = await fetch(this.apiEndpoint, {
+        // Forward the language hint to the proxy via query string so Whisper
+        // gets the same accuracy boost that the direct call enjoys.
+        const langCode = language === 'EN' ? 'en' : 'zh';
+        const proxyUrl = `${this.apiEndpoint}?language=${encodeURIComponent(langCode)}`;
+        response = await fetch(proxyUrl, {
           method: 'POST',
+          headers: {
+            'Content-Type': audioBlob.type || 'application/octet-stream'
+          },
           body: audioBlob // Send raw audio blob to proxy
         });
       } else {
